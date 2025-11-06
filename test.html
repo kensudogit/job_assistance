@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>外国人就労支援システム - CSS Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="test-styles.css">
+    <style>
+        /* 基本的なTailwind CSSクラスの代替 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .min-h-screen {
+            min-height: 100vh;
+        }
+        
+        .relative {
+            position: relative;
+        }
+        
+        .overflow-hidden {
+            overflow: hidden;
+        }
+        
+        .fixed {
+            position: fixed;
+        }
+        
+        .absolute {
+            position: absolute;
+        }
+        
+        .sticky {
+            position: sticky;
+        }
+        
+        .top-0 {
+            top: 0;
+        }
+        
+        .z-50 {
+            z-index: 50;
+        }
+        
+        .z-10 {
+            z-index: -10;
+        }
+        
+        .inset-0 {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+        
+        .max-w-7xl {
+            max-width: 1280px;
+        }
+        
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        .py-6 {
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+        }
+        
+        .p-6 {
+            padding: 1.5rem;
+        }
+        
+        .p-12 {
+            padding: 3rem;
+        }
+        
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        
+        .flex {
+            display: flex;
+        }
+        
+        .grid {
+            display: grid;
+        }
+        
+        .grid-cols-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+        
+        .gap-4 {
+            gap: 1rem;
+        }
+        
+        .gap-3 {
+            gap: 0.75rem;
+        }
+        
+        .items-center {
+            align-items: center;
+        }
+        
+        .justify-between {
+            justify-content: space-between;
+        }
+        
+        .rounded-2xl {
+            border-radius: 1rem;
+        }
+        
+        .rounded-xl {
+            border-radius: 0.75rem;
+        }
+        
+        .rounded-lg {
+            border-radius: 0.5rem;
+        }
+        
+        .shadow-xl {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .text-white {
+            color: white;
+        }
+        
+        .text-gray-600 {
+            color: #4b5563;
+        }
+        
+        .text-gray-900 {
+            color: #111827;
+        }
+        
+        .text-3xl {
+            font-size: 1.875rem;
+            line-height: 2.25rem;
+        }
+        
+        .text-2xl {
+            font-size: 1.5rem;
+            line-height: 2rem;
+        }
+        
+        .text-xl {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+        }
+        
+        .text-sm {
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+        
+        .text-3xl {
+            font-size: 1.875rem;
+            line-height: 2.25rem;
+        }
+        
+        .font-bold {
+            font-weight: 700;
+        }
+        
+        .font-semibold {
+            font-weight: 600;
+        }
+        
+        .font-medium {
+            font-weight: 500;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .space-y-6 > * + * {
+            margin-top: 1.5rem;
+        }
+        
+        .w-10 {
+            width: 2.5rem;
+        }
+        
+        .h-10 {
+            height: 2.5rem;
+        }
+        
+        .w-96 {
+            width: 24rem;
+        }
+        
+        .h-96 {
+            height: 24rem;
+        }
+        
+        .bg-blue-400 {
+            background-color: #60a5fa;
+        }
+        
+        .bg-purple-400 {
+            background-color: #a78bfa;
+        }
+        
+        .bg-indigo-400 {
+            background-color: #818cf8;
+        }
+        
+        .rounded-full {
+            border-radius: 9999px;
+        }
+        
+        .opacity-20 {
+            opacity: 0.2;
+        }
+        
+        .border-b {
+            border-bottom-width: 1px;
+        }
+        
+        .border-white\/20 {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <main class="min-h-screen relative overflow-hidden">
+        <!-- 背景装飾 -->
+        <div class="fixed inset-0 -z-10">
+            <div class="absolute top-0 left-0 w-96 h-96 bg-blue-400 rounded-full opacity-20"></div>
+            <div class="absolute top-0 right-0 w-96 h-96 bg-purple-400 rounded-full opacity-20"></div>
+            <div class="absolute bottom-0 left-1/2 w-96 h-96 bg-indigo-400 rounded-full opacity-20"></div>
+        </div>
+
+        <!-- ヘッダー -->
+        <header class="glass sticky top-0 z-50 border-b border-white/20">
+            <div class="max-w-7xl mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <span class="text-white font-bold text-xl">就</span>
+                        </div>
+                        <h1 class="text-3xl font-bold gradient-text">
+                            外国人就労支援システム
+                        </h1>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <!-- 管理者向けサマリー -->
+            <div class="space-y-6">
+                <div class="glass rounded-2xl shadow-xl overflow-hidden card-hover">
+                    <div class="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-2xl font-bold">管理者向けサマリー</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 統計サマリー -->
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="glass rounded-2xl p-6 shadow-xl card-hover">
+                        <div class="text-sm text-gray-600 mb-2">作業員数</div>
+                        <div class="text-3xl font-bold text-indigo-600">0</div>
+                    </div>
+
+                    <div class="glass rounded-2xl p-6 shadow-xl card-hover">
+                        <div class="text-sm text-gray-600 mb-2">KPI低い作業員</div>
+                        <div class="text-3xl font-bold text-red-600">0</div>
+                    </div>
+
+                    <div class="glass rounded-2xl p-6 shadow-xl card-hover">
+                        <div class="text-sm text-gray-600 mb-2">エラー多い作業員</div>
+                        <div class="text-3xl font-bold text-orange-600">0</div>
+                    </div>
+
+                    <div class="glass rounded-2xl p-6 shadow-xl card-hover">
+                        <div class="text-sm text-gray-600 mb-2">総アラート数</div>
+                        <div class="text-3xl font-bold text-yellow-600">0</div>
+                    </div>
+                </div>
+
+                <!-- 全作業員の進捗一覧 -->
+                <div class="glass rounded-2xl shadow-xl overflow-hidden card-hover">
+                    <div class="p-6 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+                        <h3 class="text-xl font-bold mb-4">全作業員の進捗</h3>
+                    </div>
+                    <div class="p-12 text-center">
+                        <p class="text-gray-500 font-medium">No workers found</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
+

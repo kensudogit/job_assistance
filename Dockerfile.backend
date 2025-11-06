@@ -1,0 +1,37 @@
+# Python Flask Backend
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# システム依存関係のインストール
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python依存関係のインストール
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# アプリケーションコードのコピー
+COPY src/ ./src/
+
+# モックデータ作成スクリプトのコピー
+COPY create_mock_data.py ./create_mock_data.py
+
+# 環境変数の設定
+ENV PYTHONUNBUFFERED=1
+ENV FLASK_APP=src.api
+ENV FLASK_ENV=production
+
+# ポート公開
+EXPOSE 5000
+
+# 起動スクリプトの作成
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# 起動コマンド
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["python", "-m", "src.api"]
+

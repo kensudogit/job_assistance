@@ -1,0 +1,40 @@
+[build-system]
+# ビルドシステムの設定
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# プロジェクト基本情報
+name = "job_assistance"
+version = "0.1.0"
+description = "就労支援システム"
+authors = [
+    { name = "R-28", email = "rr28_yosizumi@hotmail.com" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+
+# 依存パッケージ一覧
+dependencies = [
+    "sqlalchemy",      # ORMライブラリ
+    "psycopg2-binary", # PostgreSQLドライバー
+    "flask",           # Webフレームワーク
+    "flask-sqlalchemy", # Flask用SQLAlchemy拡張
+    "flask-cors",      # CORS対応
+    "flask-restful",   # RESTful API
+    "pandas",          # データ分析ライブラリ
+    "python-dateutil", # 日付処理ライブラリ
+    "pyyaml",          # YAMLファイル処理ライブラリ
+    "requests",        # HTTPリクエストライブラリ
+    "python-dotenv",   # 環境変数管理
+]
+
+[project.urls]
+# プロジェクト関連URL
+Homepage = "https://github.com/rr28yosizumi/job_assistance"
+
+[project.scripts]
+# コマンドライン実行用スクリプト設定
+job_assistance = "main:main"
+

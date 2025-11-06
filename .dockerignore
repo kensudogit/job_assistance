@@ -1,0 +1,64 @@
+# Dependencies
+node_modules
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv
+env
+ENV
+
+# Build outputs
+.next
+out
+dist
+build
+*.egg-info
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Gradle
+.gradle
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Logs
+*.log
+logs
+
+# Testing
+coverage
+.nyc_output
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+

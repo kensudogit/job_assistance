@@ -16,6 +16,7 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingTraining, setEditingTraining] = useState<ConstructionSimulatorTraining | null>(null);
+  const [selectedTraining, setSelectedTraining] = useState<ConstructionSimulatorTraining | null>(null); // 選択された訓練記録
 
   useEffect(() => {
     loadTrainings();
@@ -28,6 +29,14 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
       // データベースから実際のデータを取得
       const data = await constructionSimulatorTrainingApi.getAll(workerId);
       setTrainings(data);
+      
+      // 選択された訓練記録がある場合、最新の情報で更新
+      if (selectedTraining?.id) {
+        const updatedTraining = data.find(t => t.id === selectedTraining.id);
+        if (updatedTraining) {
+          setSelectedTraining(updatedTraining);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load simulator trainings');
     } finally {
@@ -136,11 +145,82 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
 
       {/* Unityシミュレーター */}
       <div className="glass rounded-2xl p-6 shadow-xl card-hover">
+        {selectedTraining ? (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-lg font-bold text-blue-900">選択された訓練記録</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <span className="text-blue-600 font-semibold">機械タイプ:</span>
+                <span className="ml-2 text-gray-700">{selectedTraining.machine_type}</span>
+              </div>
+              {selectedTraining.simulator_model && (
+                <div>
+                  <span className="text-blue-600 font-semibold">モデル:</span>
+                  <span className="ml-2 text-gray-700">{selectedTraining.simulator_model}</span>
+                </div>
+              )}
+              {selectedTraining.status && (
+                <div>
+                  <span className="text-blue-600 font-semibold">ステータス:</span>
+                  <span className="ml-2 text-gray-700">{selectedTraining.status}</span>
+                </div>
+              )}
+              {selectedTraining.total_training_hours !== undefined && (
+                <div>
+                  <span className="text-blue-600 font-semibold">訓練時間:</span>
+                  <span className="ml-2 text-gray-700">{selectedTraining.total_training_hours.toFixed(1)}時間</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectedTraining(null)}
+              className="mt-3 px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors"
+            >
+              選択を解除
+            </button>
+          </div>
+        ) : (
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-yellow-800">
+                訓練記録を選択すると、その訓練記録に関連付けてシミュレーターを実行できます。
+              </p>
+            </div>
+          </div>
+        )}
         <UnitySimulator
           workerId={workerId}
-          trainingMenuId={editingTraining?.id}
+          trainingMenuId={selectedTraining?.id}
           onSessionComplete={async (sessionId, sessionData) => {
             console.log('Training session completed:', sessionId, sessionData);
+            
+            // 選択された訓練記録がある場合、スコアを更新
+            if (selectedTraining?.id && sessionData.kpi_scores) {
+              try {
+                const updatedTraining: Partial<ConstructionSimulatorTraining> = {
+                  safety_score: sessionData.kpi_scores.safety_score,
+                  efficiency_score: sessionData.kpi_scores.efficiency_score,
+                  accuracy_score: sessionData.kpi_scores.accuracy_score,
+                  evaluation_score: sessionData.kpi_scores.overall_score,
+                  // 訓練時間を更新
+                  total_training_hours: (selectedTraining.total_training_hours || 0) + (sessionData.duration_seconds / 3600),
+                };
+                
+                await constructionSimulatorTrainingApi.update(workerId, selectedTraining.id, updatedTraining);
+                console.log('Training record updated with session scores');
+              } catch (err) {
+                console.error('Failed to update training record:', err);
+              }
+            }
+            
             // 訓練記録を再読み込み
             await loadTrainings();
           }}
@@ -178,6 +258,16 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedTraining(training)}
+                    className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                      selectedTraining?.id === training.id
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                  >
+                    {selectedTraining?.id === training.id ? '選択中' : '選択'}
+                  </button>
                   <button
                     onClick={() => {
                       setEditingTraining(training);

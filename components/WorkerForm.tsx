@@ -20,18 +20,46 @@ export default function WorkerForm({ onSuccess, worker }: WorkerFormProps) {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedData, setSavedData] = useState<Worker | null>(null);  // 保存されたデータを保持
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSavedData(null);
 
     try {
+      let savedWorker: Worker;
       if (worker?.id) {
-        await workerApi.update(worker.id, formData);
+        savedWorker = await workerApi.update(worker.id, formData);
+        console.log('就労者情報を更新しました:', savedWorker);
       } else {
-        await workerApi.create(formData as Worker);
+        savedWorker = await workerApi.create(formData as Worker);
+        console.log('就労者情報を登録しました:', savedWorker);
       }
+      
+      // 保存されたデータを画面に表示するために保持
+      setSavedData(savedWorker);
+      
+      // コンソールログに詳細情報を出力
+      console.log('=== 登録/更新された就労者情報 ===');
+      console.log('ID:', savedWorker.id);
+      console.log('名前:', savedWorker.name);
+      console.log('カナ名:', savedWorker.name_kana);
+      console.log('メールアドレス:', savedWorker.email);
+      console.log('電話番号:', savedWorker.phone);
+      console.log('国籍:', savedWorker.nationality);
+      console.log('母国語:', savedWorker.native_language);
+      console.log('在留資格:', savedWorker.visa_status);
+      console.log('在留期限:', savedWorker.visa_expiry_date);
+      console.log('日本語レベル:', savedWorker.japanese_level);
+      console.log('現在のステータス:', savedWorker.current_status);
+      console.log('スキル:', savedWorker.skills);
+      console.log('備考:', savedWorker.notes);
+      console.log('作成日時:', savedWorker.created_at);
+      console.log('更新日時:', savedWorker.updated_at);
+      console.log('================================');
+      
       onSuccess?.();
       if (!worker) {
         setFormData({
@@ -42,6 +70,7 @@ export default function WorkerForm({ onSuccess, worker }: WorkerFormProps) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save worker');
+      console.error('保存エラー:', err);
     } finally {
       setLoading(false);
     }
@@ -71,6 +100,95 @@ export default function WorkerForm({ onSuccess, worker }: WorkerFormProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {error}
+            </div>
+          </div>
+        )}
+
+        {savedData && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 text-green-800 px-4 py-4 rounded-lg shadow-md animate-slide-up">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg mb-2 text-green-900">
+                  {worker?.id ? '就労者情報を更新しました' : '就労者情報を登録しました'}
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      <span className="font-semibold text-green-900">ID:</span>
+                      <span className="ml-2 text-green-700">{savedData.id}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-green-900">名前:</span>
+                      <span className="ml-2 text-green-700">{savedData.name}</span>
+                    </div>
+                    {savedData.name_kana && (
+                      <div>
+                        <span className="font-semibold text-green-900">カナ名:</span>
+                        <span className="ml-2 text-green-700">{savedData.name_kana}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-semibold text-green-900">メールアドレス:</span>
+                      <span className="ml-2 text-green-700">{savedData.email}</span>
+                    </div>
+                    {savedData.phone && (
+                      <div>
+                        <span className="font-semibold text-green-900">電話番号:</span>
+                        <span className="ml-2 text-green-700">{savedData.phone}</span>
+                      </div>
+                    )}
+                    {savedData.nationality && (
+                      <div>
+                        <span className="font-semibold text-green-900">国籍:</span>
+                        <span className="ml-2 text-green-700">{savedData.nationality}</span>
+                      </div>
+                    )}
+                    {savedData.native_language && (
+                      <div>
+                        <span className="font-semibold text-green-900">母国語:</span>
+                        <span className="ml-2 text-green-700">{savedData.native_language}</span>
+                      </div>
+                    )}
+                    {savedData.visa_status && (
+                      <div>
+                        <span className="font-semibold text-green-900">在留資格:</span>
+                        <span className="ml-2 text-green-700">{savedData.visa_status}</span>
+                      </div>
+                    )}
+                    {savedData.visa_expiry_date && (
+                      <div>
+                        <span className="font-semibold text-green-900">在留期限:</span>
+                        <span className="ml-2 text-green-700">{savedData.visa_expiry_date}</span>
+                      </div>
+                    )}
+                    {savedData.japanese_level && (
+                      <div>
+                        <span className="font-semibold text-green-900">日本語レベル:</span>
+                        <span className="ml-2 text-green-700">{savedData.japanese_level}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-semibold text-green-900">現在のステータス:</span>
+                      <span className="ml-2 text-green-700">{savedData.current_status}</span>
+                    </div>
+                    {savedData.skills && (
+                      <div className="md:col-span-2">
+                        <span className="font-semibold text-green-900">スキル:</span>
+                        <span className="ml-2 text-green-700">{savedData.skills}</span>
+                      </div>
+                    )}
+                    {savedData.notes && (
+                      <div className="md:col-span-2">
+                        <span className="font-semibold text-green-900">備考:</span>
+                        <span className="ml-2 text-green-700">{savedData.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

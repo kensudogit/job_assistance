@@ -5,7 +5,14 @@
 import axios from 'axios';
 
 // APIベースURL（環境変数から取得、デフォルトはlocalhost:5000）
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+// 本番環境では環境変数VITE_API_BASE_URLを設定する必要があります
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.NEXT_PUBLIC_API_BASE_URL || 
+  (import.meta.env.PROD ? '' : 'http://localhost:5000');  // 本番環境では空文字列（相対パス）を使用
+
+// デバッグ用: APIベースURLをコンソールに出力
+if (import.meta.env.DEV) {
+  console.log('API Base URL:', API_BASE_URL || '(相対パス)');
+}
 
 // Axiosインスタンスの作成（共通設定）
 export const api = axios.create({

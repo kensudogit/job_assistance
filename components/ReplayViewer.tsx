@@ -4,9 +4,10 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { replayApi, type ReplayData } from '@/lib/api';
+import html2canvas from 'html2canvas';
 
 /**
  * リプレイビューアコンポーネントのプロパティ
@@ -29,6 +30,15 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
   const [currentTime, setCurrentTime] = useState(0);                       // 現在の再生時刻（ミリ秒）
   const [isPlaying, setIsPlaying] = useState(false);                       // 再生状態
   const [playbackSpeed, setPlaybackSpeed] = useState(1);                   // 再生速度（0.5x, 1x, 1.5x, 2x）
+  const [isRecording, setIsRecording] = useState(false);                   // 録画状態
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);  // メディアレコーダー
+  const replayContainerRef = useRef<HTMLDivElement>(null);                 // リプレイコンテナの参照
+  const drawIntervalRef = useRef<number | null>(null);                      // 描画インターバルの参照
+  const isCapturingRef = useRef(false);                                    // キャプチャ中のフラグ
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);                // Canvasの参照
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);            // Canvasコンテキストの参照
+  const isRecordingRef = useRef(false);                                     // 録画状態の参照
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);             // メディアレコーダーの参照
 
   // セッションIDが変更されたときにリプレイデータを読み込む
   useEffect(() => {
@@ -100,6 +110,194 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
     }
   };
 
+  /**
+   * 動画録画を開始
+   * html2canvasを使用して画面をキャプチャし、MediaRecorder APIで動画として録画
+   */
+  const handleStartRecording = async () => {
+    try {
+      if (!replayContainerRef.current) {
+        setError('録画対象の要素が見つかりません');
+        return;
+      }
+
+      // 実際の要素のサイズを取得
+      const rect = replayContainerRef.current.getBoundingClientRect();
+      const width = Math.max(rect.width, 1280); // 最小幅1280px
+      const height = Math.max(rect.height, 720); // 最小高さ720px
+
+      // Canvasを作成してMediaRecorderに接続
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { alpha: false }); // アルファチャンネルを無効化
+      
+      if (!ctx) {
+        setError('Canvasコンテキストの取得に失敗しました');
+        return;
+      }
+
+      // Canvasとコンテキストをrefに保存
+      canvasRef.current = canvas;
+      ctxRef.current = ctx;
+
+      // 背景色を設定
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // MediaRecorder APIを使用して動画を録画
+      const stream = canvas.captureStream(10); // 10fps（html2canvasの処理時間を考慮）
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+        ? 'video/webm;codecs=vp9' 
+        : MediaRecorder.isTypeSupported('video/webm') 
+        ? 'video/webm' 
+        : 'video/mp4';
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 2500000, // 2.5Mbps
+      });
+
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        // 描画インターバルをクリア
+        if (drawIntervalRef.current) {
+          clearInterval(drawIntervalRef.current);
+          drawIntervalRef.current = null;
+        }
+        isCapturingRef.current = false;
+        isRecordingRef.current = false;
+        
+        // Canvasとコンテキストをクリア
+        canvasRef.current = null;
+        ctxRef.current = null;
+        mediaRecorderRef.current = null;
+        
+        if (chunks.length > 0) {
+          const blob = new Blob(chunks, { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const extension = mimeType.includes('webm') ? 'webm' : 'mp4';
+          a.download = `replay-${sessionId}-${Date.now()}.${extension}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          console.log('[ReplayViewer] 動画の録画が完了しました。ファイルサイズ:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
+          console.log('[ReplayViewer] 動画形式:', mimeType);
+          console.log('[ReplayViewer] 動画チャンク数:', chunks.length);
+        } else {
+          setError('録画されたデータがありません。');
+        }
+        setIsRecording(false);
+        setMediaRecorder(null);
+      };
+
+      recorder.start(100); // 100msごとにデータを取得
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      mediaRecorderRef.current = recorder;
+
+      // 再生を開始して録画
+      if (!isPlaying) {
+        setIsPlaying(true);
+      }
+
+      // 録画中は定期的にhtml2canvasで画面をキャプチャしてCanvasに描画
+      const captureFrame = async () => {
+        if (!replayContainerRef.current || !ctxRef.current || !canvasRef.current || isCapturingRef.current) return;
+        
+        isCapturingRef.current = true;
+        try {
+          // html2canvasを使用して画面をキャプチャ
+          const canvasElement = await html2canvas(replayContainerRef.current, {
+            width: width,
+            height: height,
+            scale: 1,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+          });
+          
+          // キャプチャした画像をCanvasに描画
+          const ctx = ctxRef.current;
+          const canvas = canvasRef.current;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(canvasElement, 0, 0, canvas.width, canvas.height);
+        } catch (err) {
+          console.error('画面キャプチャエラー:', err);
+        } finally {
+          isCapturingRef.current = false;
+        }
+      };
+
+      // 最初のフレームをキャプチャ
+      await captureFrame();
+
+      // 定期的にフレームをキャプチャ（非同期処理を考慮して間隔を調整）
+      // 前のフレームのキャプチャが完了してから次のフレームをキャプチャする
+      const captureLoop = async () => {
+        while (isRecordingRef.current && mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          if (!isCapturingRef.current) {
+            await captureFrame();
+          }
+          // 次のフレームまで待機（10fps = 100ms）
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      };
+
+      // キャプチャループを開始
+      captureLoop().catch(err => {
+        console.error('キャプチャループエラー:', err);
+        setIsRecording(false);
+        isRecordingRef.current = false;
+      });
+    } catch (err) {
+      console.error('録画開始エラー:', err);
+      setError(err instanceof Error ? err.message : '録画の開始に失敗しました');
+      setIsRecording(false);
+    }
+  };
+
+  /**
+   * 動画録画を停止
+   */
+  const handleStopRecording = () => {
+    isRecordingRef.current = false;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    // 描画インターバルをクリア
+    if (drawIntervalRef.current) {
+      clearInterval(drawIntervalRef.current);
+      drawIntervalRef.current = null;
+    }
+  };
+
+  // クリーンアップ: コンポーネントのアンマウント時に録画を停止
+  useEffect(() => {
+    return () => {
+      isRecordingRef.current = false;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (drawIntervalRef.current) {
+        clearInterval(drawIntervalRef.current);
+      }
+    };
+  }, []); // コンポーネントのアンマウント時にのみクリーンアップ
+
   if (loading) {
     return (
       <div className="glass rounded-2xl p-12 text-center">
@@ -141,7 +339,7 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={replayContainerRef}>
       {/* ヘッダー */}
       <div className="glass rounded-2xl shadow-xl overflow-hidden card-hover">
         <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
@@ -204,6 +402,33 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
             <option value="1.5">1.5x</option>
             <option value="2">2x</option>
           </select>
+
+          {/* 録画ボタン */}
+          {!isRecording ? (
+            <button
+              onClick={handleStartRecording}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors flex items-center gap-2"
+              title="動画録画を開始"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <circle cx="12" cy="12" r="4" fill="currentColor"/>
+              </svg>
+              録画開始
+            </button>
+          ) : (
+            <button
+              onClick={handleStopRecording}
+              className="px-4 py-2 bg-red-700 text-white rounded-lg font-semibold hover:bg-red-800 transition-colors flex items-center gap-2 animate-pulse"
+              title="動画録画を停止"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <rect x="9" y="9" width="6" height="6" fill="currentColor"/>
+              </svg>
+              録画中...
+            </button>
+          )}
         </div>
       </div>
 
@@ -211,6 +436,29 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
         {/* リプレイビューア */}
         <div className="lg:col-span-2 glass rounded-2xl p-6 shadow-xl card-hover">
           <h3 className="text-xl font-bold mb-4">操作ログ再生</h3>
+          
+          {/* Unityシミュレーション動画の説明 */}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-blue-800 font-semibold mb-1">Unityシミュレーション動画について</p>
+                <p className="text-xs text-blue-700">
+                  現在はモックモードで動作しているため、実際のUnityシミュレーション動画は再生されません。
+                  Unity WebGLビルドを配置すると、ここにシミュレーション動画が表示されます。
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  • Unity WebGLビルドを <code className="bg-blue-100 px-1 rounded">public/unity-build/</code> に配置<br/>
+                  • 必要なファイル: Build.loader.js, Build.data, Build.framework.js, Build.wasm<br/>
+                  • 現在は操作ログのみを表示しています
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 操作ログ表示 */}
           <div className="bg-gray-900 rounded-lg p-4 min-h-[400px] text-green-400 font-mono text-sm overflow-auto">
             {currentLogs.length > 0 ? (
               <div className="space-y-2">
@@ -218,6 +466,9 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
                   <div key={index} className="flex items-center gap-2">
                     <span className="text-gray-500">{new Date(log.timestamp || '').toLocaleTimeString()}</span>
                     <span className="text-blue-400">{log.operation_type || '操作'}</span>
+                    {log.operation_value && (
+                      <span className="text-yellow-400">: {log.operation_value}</span>
+                    )}
                     {log.error_event && (
                       <span className="text-red-400">⚠ エラー: {log.error_description}</span>
                     )}
@@ -225,7 +476,12 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
                 ))}
               </div>
             ) : (
-              <div className="text-center text-gray-500 mt-20">操作ログがありません</div>
+              <div className="text-center text-gray-500 mt-20">
+                <p>操作ログがありません</p>
+                <p className="text-xs mt-2 text-gray-400">
+                  訓練セッション中に記録された操作ログがここに表示されます
+                </p>
+              </div>
             )}
           </div>
         </div>

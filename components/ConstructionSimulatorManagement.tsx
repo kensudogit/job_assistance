@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { constructionSimulatorTrainingApi, type ConstructionSimulatorTraining } from '@/lib/api';
+import UnitySimulator from '@/components/UnitySimulator';
 
 interface ConstructionSimulatorManagementProps {
   workerId: number;
@@ -24,6 +25,7 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
     try {
       setLoading(true);
       setError(null);
+      // データベースから実際のデータを取得
       const data = await constructionSimulatorTrainingApi.getAll(workerId);
       setTrainings(data);
     } catch (err) {
@@ -46,11 +48,14 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
 
   const handleSaveTraining = async (training: ConstructionSimulatorTraining) => {
     try {
+      // データベースに実際のデータを保存
       if (training.id) {
         await constructionSimulatorTrainingApi.update(workerId, training.id, training);
       } else {
         await constructionSimulatorTrainingApi.create(workerId, training);
       }
+      
+      // データベースから最新のデータを再取得
       await loadTrainings();
       setShowForm(false);
       setEditingTraining(null);
@@ -62,7 +67,10 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
   const handleDeleteTraining = async (id: number) => {
     if (!confirm('この訓練記録を削除しますか？')) return;
     try {
+      // データベースから実際のデータを削除
       await constructionSimulatorTrainingApi.delete(workerId, id);
+      
+      // データベースから最新のデータを再取得
       await loadTrainings();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete training');
@@ -125,6 +133,19 @@ export default function ConstructionSimulatorManagement({ workerId }: Constructi
           />
         </div>
       )}
+
+      {/* Unityシミュレーター */}
+      <div className="glass rounded-2xl p-6 shadow-xl card-hover">
+        <UnitySimulator
+          workerId={workerId}
+          trainingMenuId={editingTraining?.id}
+          onSessionComplete={async (sessionId, sessionData) => {
+            console.log('Training session completed:', sessionId, sessionData);
+            // 訓練記録を再読み込み
+            await loadTrainings();
+          }}
+        />
+      </div>
 
       {/* 訓練一覧 */}
       {trainings.length === 0 ? (

@@ -78,7 +78,7 @@ class Applicant(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
     email = Column(String(100), nullable=False)
-    phone = Column(String(20))
+    phone = Column(String(500))  # 暗号化された値を保存するため、サイズを拡張
     address = Column(String(200))
     skills = Column(Text)  # カンマ区切りでスキルを保存
     experience_years = Column(Integer, default=0)
@@ -165,7 +165,7 @@ class Worker(Base):
     name = Column(String(100), nullable=False)
     name_kana = Column(String(100))  # カナ名
     email = Column(String(100), nullable=False)
-    phone = Column(String(20))
+    phone = Column(String(500))  # 暗号化された値を保存するため、サイズを拡張
     address = Column(String(200))
     birth_date = Column(Date)
     nationality = Column(String(100))  # 国籍
@@ -575,7 +575,7 @@ class TrainingSession(Base):
     
     id = Column(Integer, primary_key=True)
     session_id = Column(String(100), unique=True, nullable=False)  # Unityから送信されるセッションID
-    worker_id = Column(Integer, ForeignKey('workers.id'), nullable=False)
+    worker_id = Column(Integer, ForeignKey('workers.id'), nullable=True)  # NULLを許可（モックモードやテスト用）
     training_menu_id = Column(Integer, ForeignKey('training_menus.id'), nullable=True)
     session_start_time = Column(DateTime, nullable=False)
     session_end_time = Column(DateTime, nullable=False)
@@ -910,38 +910,101 @@ class Database:
         from sqlalchemy import text, inspect
         inspector = inspect(self.engine)
         
-        # training_sessionsテーブルにoperation_logs_jsonカラムが存在しない場合は追加
+        # training_sessionsテーブルに不足しているカラムを追加
         if 'training_sessions' in inspector.get_table_names():
             try:
                 columns = [col['name'] for col in inspector.get_columns('training_sessions')]
-                if 'operation_logs_json' not in columns:
-                    # PostgreSQLの場合、IF NOT EXISTS句を使用
-                    db_type = self.engine.dialect.name
-                    if db_type == 'postgresql':
-                        with self.engine.begin() as conn:
-                            conn.execute(text("""
-                                DO $$ 
-                                BEGIN 
-                                    IF NOT EXISTS (
-                                        SELECT 1 FROM information_schema.columns 
-                                        WHERE table_name = 'training_sessions' 
-                                        AND column_name = 'operation_logs_json'
-                                    ) THEN
-                                        ALTER TABLE training_sessions ADD COLUMN operation_logs_json TEXT;
-                                    END IF;
-                                END $$;
-                            """))
+                db_type = self.engine.dialect.name
+                
+                # 追加が必要なカラムのリスト
+                required_columns = {
+                    'operation_logs_json': 'TEXT',
+                    'ai_evaluation_json': 'TEXT',
+                    'replay_data_json': 'TEXT',
+                }
+                
+                for col_name, col_type in required_columns.items():
+                    if col_name not in columns:
+                        if db_type == 'postgresql':
+                            with self.engine.begin() as conn:
+                                conn.execute(text(f"""
+                                    DO $$ 
+                                    BEGIN 
+                                        IF NOT EXISTS (
+                                            SELECT 1 FROM information_schema.columns 
+                                            WHERE table_name = 'training_sessions' 
+                                            AND column_name = '{col_name}'
+                                        ) THEN
+                                            ALTER TABLE training_sessions ADD COLUMN {col_name} {col_type};
+                                        END IF;
+                                    END $$;
+                                """))
+                        else:
+                            # その他のデータベース（SQLiteなど）
+                            with self.engine.begin() as conn:
+                                conn.execute(text(f"ALTER TABLE training_sessions ADD COLUMN {col_name} {col_type}"))
+                        print(f"training_sessionsテーブルに{col_name}カラムを追加しました。")
                     else:
-                        # その他のデータベース（SQLiteなど）
-                        with self.engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE training_sessions ADD COLUMN operation_logs_json TEXT"))
-                    print("training_sessionsテーブルにoperation_logs_jsonカラムを追加しました。")
-                else:
-                    print("training_sessionsテーブルにoperation_logs_jsonカラムは既に存在します。")
+                        print(f"training_sessionsテーブルに{col_name}カラムは既に存在します。")
             except Exception as e:
                 print(f"カラム追加エラー: {e}")
                 import traceback
                 traceback.print_exc()
+        
+        # training_sessionsテーブルのworker_idカラムをNULLを許可するように変更
+        if 'training_sessions' in inspector.get_table_names():
+            try:
+                columns = {col['name']: col for col in inspector.get_columns('training_sessions')}
+                if 'worker_id' in columns:
+                    # worker_idカラムがNOT NULL制約を持っている場合、NULLを許可するように変更
+                    db_type = self.engine.dialect.name
+                    if db_type == 'postgresql':
+                        # PostgreSQLの場合、カラムのNULL制約を確認
+                        with self.engine.begin() as conn:
+                            result = conn.execute(text("""
+                                SELECT is_nullable 
+                                FROM information_schema.columns 
+                                WHERE table_name = 'training_sessions' 
+                                AND column_name = 'worker_id'
+                            """))
+                            row = result.fetchone()
+                            if row and row[0] == 'NO':
+                                # NOT NULL制約がある場合、NULLを許可するように変更
+                                conn.execute(text("ALTER TABLE training_sessions ALTER COLUMN worker_id DROP NOT NULL"))
+                                print("training_sessionsテーブルのworker_idカラムをNULLを許可するように変更しました。")
+                            else:
+                                print("training_sessionsテーブルのworker_idカラムは既にNULLを許可しています。")
+                    else:
+                        # SQLiteなど、ALTER COLUMNをサポートしないデータベースの場合
+                        print(f"training_sessionsテーブルのworker_idカラムのNULL制約変更はスキップされました（データベースタイプ: {db_type}）。")
+            except Exception as e:
+                print(f"training_sessionsテーブルのworker_idカラム変更エラー: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # workersテーブルとapplicantsテーブルのphoneカラムのサイズを拡張
+        for table_name in ['workers', 'applicants']:
+            if table_name in inspector.get_table_names():
+                try:
+                    columns = {col['name']: col for col in inspector.get_columns(table_name)}
+                    if 'phone' in columns:
+                        current_type = str(columns['phone']['type'])
+                        # 現在のサイズが20文字以下の場合、拡張する
+                        if 'varchar(20)' in current_type.lower() or 'character varying(20)' in current_type.lower():
+                            db_type = self.engine.dialect.name
+                            if db_type == 'postgresql':
+                                with self.engine.begin() as conn:
+                                    conn.execute(text(f"ALTER TABLE {table_name} ALTER COLUMN phone TYPE VARCHAR(500)"))
+                                print(f"{table_name}テーブルのphoneカラムのサイズを拡張しました。")
+                            else:
+                                # SQLiteなど、ALTER COLUMNをサポートしないデータベースの場合
+                                print(f"{table_name}テーブルのphoneカラムのサイズ拡張はスキップされました（データベースタイプ: {db_type}）。")
+                        else:
+                            print(f"{table_name}テーブルのphoneカラムは既に適切なサイズです。")
+                except Exception as e:
+                    print(f"{table_name}テーブルのphoneカラム拡張エラー: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         print("データベースを初期化しました。")
     

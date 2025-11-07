@@ -1755,9 +1755,15 @@ class TrainingSessionListResource(Resource):
     def get(self, worker_id):
         session = db.get_session()
         try:
-            sessions = session.query(TrainingSession).filter(
-                TrainingSession.worker_id == worker_id
-            ).order_by(TrainingSession.session_start_time.desc()).all()
+            # worker_idが0の場合、worker_idがnullの訓練セッションも含めて取得
+            if worker_id == 0:
+                sessions = session.query(TrainingSession).filter(
+                    (TrainingSession.worker_id == worker_id) | (TrainingSession.worker_id.is_(None))
+                ).order_by(TrainingSession.session_start_time.desc()).all()
+            else:
+                sessions = session.query(TrainingSession).filter(
+                    TrainingSession.worker_id == worker_id
+                ).order_by(TrainingSession.session_start_time.desc()).all()
             
             return {
                 'success': True,
@@ -3024,14 +3030,24 @@ class UnityTrainingSessionResource(Resource):
                 TrainingSession.session_id == data.get('session_id')
             ).first()
             
+            # worker_idのバリデーション（0の場合はNULLに設定）
+            worker_id = data.get('worker_id')
+            if worker_id == 0 or worker_id is None:
+                # worker_idが0またはNoneの場合は、NULLに設定（外部キー制約違反を回避）
+                worker_id = None
+                app.logger.warning(f'UnityTrainingSession: worker_id=0 or None, setting to NULL for session_id={data.get("session_id")}')
+            
             if existing_session:
                 # 既存セッションの更新
                 session_obj = existing_session
+                # worker_idが0の場合は更新しない
+                if worker_id is not None:
+                    session_obj.worker_id = worker_id
             else:
                 # 新規セッションの作成
                 session_obj = TrainingSession(
                     session_id=data.get('session_id'),
-                    worker_id=data.get('worker_id'),
+                    worker_id=worker_id,  # NULLまたは有効なworker_id
                     training_menu_id=data.get('training_menu_id'),
                     session_start_time=datetime.fromisoformat(data['session_start_time'].replace('Z', '+00:00')),
                     session_end_time=datetime.fromisoformat(data['session_end_time'].replace('Z', '+00:00')),
@@ -3044,6 +3060,7 @@ class UnityTrainingSessionResource(Resource):
             # 操作ログ、AI評価、リプレイデータを保存
             if 'operation_logs' in data:
                 # session_obj.operation_logs_json = json.dumps(data['operation_logs'])  # 一時的にコメントアウト（データベースマイグレーション後に有効化）
+                pass  # 一時的に何もしない
             
             if 'ai_evaluation' in data:
                 session_obj.ai_evaluation_json = json.dumps(data['ai_evaluation'])
@@ -3148,12 +3165,27 @@ class ReplaySessionResource(Resource):
             if not training_session:
                 return {'success': False, 'error': 'Session not found'}, 404
             
-            # 役割ベースアクセス制御
+            # 役割ベースアクセス制御（認証が有効な場合のみ）
             user_id = session.get('user_id')
-            user = session_db.query(User).filter(User.id == user_id).first()
+            if user_id:
+                user = session_db.query(User).filter(User.id == user_id).first()
+                if user and user.role == 'trainee' and training_session.worker_id is not None and training_session.worker_id != user.worker_id:
+                    return {'success': False, 'error': 'Access denied'}, 403
             
-            if user.role == 'trainee' and training_session.worker_id != user.worker_id:
-                return {'success': False, 'error': 'Access denied'}, 403
+            # 操作ログを取得（OperationLogテーブルから）
+            operation_logs_list = []
+            operation_logs = session_db.query(OperationLog).filter(
+                OperationLog.training_session_id == training_session.id
+            ).order_by(OperationLog.timestamp).all()
+            
+            for log in operation_logs:
+                operation_logs_list.append({
+                    'timestamp': serialize_date(log.timestamp),
+                    'operation_type': log.operation_type,
+                    'operation_value': log.operation_value,
+                    'error_event': log.error_event,
+                    'error_description': log.error_description,
+                })
             
             # リプレイデータを構築
             replay_data = {
@@ -3162,8 +3194,7 @@ class ReplaySessionResource(Resource):
                 'session_start_time': serialize_date(training_session.session_start_time),
                 'session_end_time': serialize_date(training_session.session_end_time),
                 'duration_seconds': training_session.duration_seconds,
-                'operation_logs': [],  # 一時的に空配列を返す（データベースマイグレーション後に有効化）
-                # 'operation_logs': json.loads(training_session.operation_logs_json) if training_session.operation_logs_json else [],
+                'operation_logs': operation_logs_list,  # OperationLogテーブルから取得
                 'ai_evaluation': json.loads(training_session.ai_evaluation_json) if training_session.ai_evaluation_json else {},
                 'replay_data': json.loads(training_session.replay_data_json) if training_session.replay_data_json else {},
             }

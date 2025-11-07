@@ -63,8 +63,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         onLoginSuccess(user);
       }
     } catch (err) {
-      // エラーを設定
-      setError(err instanceof Error ? err.message : (isRegisterMode ? '新規登録に失敗しました' : 'ログインに失敗しました'));
+      // エラーを設定（詳細なエラーメッセージを表示）
+      let errorMessage = '';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        errorMessage = String(err.message);
+      } else {
+        errorMessage = isRegisterMode ? 'Registration failed' : 'Login failed';
+      }
+      console.error('Auth error:', err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

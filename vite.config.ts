@@ -5,6 +5,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES Moduleで__dirnameを取得
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -37,6 +42,9 @@ export default defineConfig({
     outDir: 'dist',          // 出力ディレクトリ
     sourcemap: false,        // ソースマップを無効化（本番環境）
     minify: 'esbuild',       // ミニファイにesbuildを使用
+    emptyOutDir: true,       // 出力ディレクトリをクリア
   },
+  // ベースパス（Vercelではルートパスを使用）
+  base: '/',
 });
 

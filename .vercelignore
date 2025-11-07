@@ -13,7 +13,9 @@ Dockerfile*
 docker-compose*.yml
 docker-entrypoint.sh
 requirements.txt
-src/
+src/*.py
+src/__pycache__
+src/__init__.py
 create_mock_data*.py
 init_database.py
 nginx.conf

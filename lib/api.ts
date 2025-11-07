@@ -8,12 +8,40 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 // Axiosインスタンスの作成（共通設定）
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,  // ベースURL
   headers: {
     'Content-Type': 'application/json',  // JSON形式でリクエスト
   },
 });
+
+// エラーレスポンスのインターセプター
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // エラーレスポンスを処理
+    if (error.response) {
+      // サーバーからのエラーレスポンス
+      const errorMessage = error.response.data?.error || error.response.data?.message || error.message || 'An error occurred';
+      console.error('API Error:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        message: errorMessage,
+      });
+      // エラーオブジェクトにメッセージを追加
+      error.message = errorMessage;
+    } else if (error.request) {
+      // リクエストは送信されたが、レスポンスが受信されなかった
+      console.error('Network Error:', error.request);
+      error.message = 'Network error. Please check your connection.';
+    } else {
+      // リクエストの設定中にエラーが発生
+      console.error('Request Error:', error.message);
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface Worker {
   id?: number;
@@ -893,23 +921,37 @@ export interface RegisterCredentials {
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<User> => {
-    const response = await api.post<ApiResponse<User>>('/api/auth/login', credentials, {
-      withCredentials: true,
-    });
-    if (response.data.success && response.data.data) {
-      return response.data.data;
+    try {
+      const response = await api.post<ApiResponse<User>>('/api/auth/login', credentials, {
+        withCredentials: true,
+      });
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.error || 'Failed to login');
+    } catch (error: any) {
+      // エラーメッセージを取得
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to login';
+      console.error('Login error:', error);
+      throw new Error(errorMessage);
     }
-    throw new Error(response.data.error || 'Failed to login');
   },
 
   register: async (credentials: RegisterCredentials): Promise<User> => {
-    const response = await api.post<ApiResponse<User>>('/api/auth/register', credentials, {
-      withCredentials: true,
-    });
-    if (response.data.success && response.data.data) {
-      return response.data.data;
+    try {
+      const response = await api.post<ApiResponse<User>>('/api/auth/register', credentials, {
+        withCredentials: true,
+      });
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.error || 'Failed to register');
+    } catch (error: any) {
+      // エラーメッセージを取得
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to register';
+      console.error('Register error:', error);
+      throw new Error(errorMessage);
     }
-    throw new Error(response.data.error || 'Failed to register');
   },
 
   logout: async (): Promise<void> => {

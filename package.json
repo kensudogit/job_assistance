@@ -1,6 +1,7 @@
 {
   "name": "job_assistance",
   "version": "1.0.0",
+  "type": "module",
   "description": "就労支援システム   求人情報管理、応募者管理、マッチング、面接スケジュール管理などの機能を提供します。",
   "main": "index.js",
   "scripts": {
@@ -10,7 +11,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +23,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "axios": "^1.13.2",
+    "html2canvas": "^1.4.1",
     "i18next": "^25.6.0",
     "i18next-browser-languagedetector": "^8.2.0",
     "next": "^16.0.1",

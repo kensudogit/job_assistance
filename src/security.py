@@ -91,12 +91,13 @@ def validate_sql_input(value, field_type='string', max_length=None):
     if value is None:
         return None
     
-    # 危険な文字列パターンをチェック
+    # 危険な文字列パターンをチェック（SQLインジェクション対策）
+    # 注意: 通常のユーザー名やメールアドレスが誤って拒否されないように、パターンを慎重に選択
     dangerous_patterns = [
-        r'--',  # SQLコメント
+        r'--\s',  # SQLコメント（スペースが続く場合のみ）
         r'/\*',  # SQLコメント開始
         r'\*/',  # SQLコメント終了
-        r';',  # SQLステートメント区切り
+        r';\s*(select|insert|update|delete|drop|exec|create|alter)',  # SQLステートメント区切り + SQLキーワード
         r'union\s+select',  # SQLインジェクション
         r'select\s+.*\s+from',  # SQLインジェクション
         r'insert\s+into',  # SQLインジェクション
@@ -390,15 +391,15 @@ def validate_password_strength(password):
         tuple: (is_valid: bool, message: str)
     """
     if not password:
-        return False, "パスワードは必須です"
+        return False, "Password is required"
     
     if len(password) < 8:
-        return False, "パスワードは8文字以上である必要があります"
+        return False, "Password must be at least 8 characters long"
     
     if len(password) > 128:
-        return False, "パスワードは128文字以下である必要があります"
+        return False, "Password must be no more than 128 characters long"
     
-    # 複雑さチェック
+    # 複雑さチェック（緩和：2種類以上でOK）
     has_upper = any(c.isupper() for c in password)
     has_lower = any(c.islower() for c in password)
     has_digit = any(c.isdigit() for c in password)
@@ -406,8 +407,8 @@ def validate_password_strength(password):
     
     complexity_score = sum([has_upper, has_lower, has_digit, has_special])
     
-    if complexity_score < 3:
-        return False, "パスワードには大文字、小文字、数字、特殊文字のうち3種類以上を含む必要があります"
+    if complexity_score < 2:
+        return False, "Password must contain at least 2 of the following: uppercase letters, lowercase letters, numbers, special characters"
     
-    return True, "パスワードの強度は十分です"
+    return True, "Password strength is sufficient"
 

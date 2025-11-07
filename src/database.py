@@ -580,7 +580,7 @@ class TrainingSession(Base):
     session_start_time = Column(DateTime, nullable=False)
     session_end_time = Column(DateTime, nullable=False)
     duration_seconds = Column(Integer)  # セッション時間（秒）
-    operation_logs_json = Column(Text)  # 操作ログ（JSON形式でタイムライン記録）
+    # operation_logs_json = Column(Text, nullable=True)  # 操作ログ（JSON形式でタイムライン記録）- データベースマイグレーションで追加される（一時的にコメントアウト）
     ai_evaluation_json = Column(Text)  # AI評価コメント（JSON形式）
     replay_data_json = Column(Text)  # リプレイ用データ（JSON形式）
     status = Column(String(50), default='完了')  # 完了、中断、エラー
@@ -905,6 +905,44 @@ class Database:
         Base.metadataに定義されたすべてのテーブルをデータベースに作成する
         """
         Base.metadata.create_all(self.engine)
+        
+        # 既存のテーブルにカラムを追加（マイグレーション）
+        from sqlalchemy import text, inspect
+        inspector = inspect(self.engine)
+        
+        # training_sessionsテーブルにoperation_logs_jsonカラムが存在しない場合は追加
+        if 'training_sessions' in inspector.get_table_names():
+            try:
+                columns = [col['name'] for col in inspector.get_columns('training_sessions')]
+                if 'operation_logs_json' not in columns:
+                    # PostgreSQLの場合、IF NOT EXISTS句を使用
+                    db_type = self.engine.dialect.name
+                    if db_type == 'postgresql':
+                        with self.engine.begin() as conn:
+                            conn.execute(text("""
+                                DO $$ 
+                                BEGIN 
+                                    IF NOT EXISTS (
+                                        SELECT 1 FROM information_schema.columns 
+                                        WHERE table_name = 'training_sessions' 
+                                        AND column_name = 'operation_logs_json'
+                                    ) THEN
+                                        ALTER TABLE training_sessions ADD COLUMN operation_logs_json TEXT;
+                                    END IF;
+                                END $$;
+                            """))
+                    else:
+                        # その他のデータベース（SQLiteなど）
+                        with self.engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE training_sessions ADD COLUMN operation_logs_json TEXT"))
+                    print("training_sessionsテーブルにoperation_logs_jsonカラムを追加しました。")
+                else:
+                    print("training_sessionsテーブルにoperation_logs_jsonカラムは既に存在します。")
+            except Exception as e:
+                print(f"カラム追加エラー: {e}")
+                import traceback
+                traceback.print_exc()
+        
         print("データベースを初期化しました。")
     
     def get_session(self):

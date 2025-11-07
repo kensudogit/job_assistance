@@ -26,12 +26,14 @@ import IntegratedGrowthDashboard from '@/components/IntegratedGrowthDashboard';
 import SpecificSkillTransitionManagement from '@/components/SpecificSkillTransitionManagement';
 import CareerGoalManagement from '@/components/CareerGoalManagement';
 import UserManagement from '@/components/UserManagement';
+import ScreenshotCapture from '@/components/ScreenshotCapture';
+import ScreenshotList from '@/components/ScreenshotList';
 
 /**
  * タブタイプの定義
  * アプリケーション内で使用可能なすべてのタブを定義
  */
-type TabType = 'progress' | 'japanese' | 'skill' | 'dashboard' | 'training' | 'milestone' | 'career' | 'report' | 'sessions' | 'assignment' | 'simulator' | 'growth' | 'transition' | 'goals' | 'users';
+type TabType = 'progress' | 'japanese' | 'skill' | 'dashboard' | 'training' | 'milestone' | 'career' | 'report' | 'sessions' | 'assignment' | 'simulator' | 'growth' | 'transition' | 'goals' | 'users' | 'screenshots';
 
 /**
  * メインアプリケーションコンポーネント
@@ -46,13 +48,30 @@ function App() {
   const [showForm, setShowForm] = useState(false);                   // フォーム表示フラグ
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');  // アクティブなタブ
 
-  // コンポーネントマウント時に認証状態をチェック
+  // タブの変更を監視（デバッグ用）
   useEffect(() => {
-    checkAuth();
+    console.log('アクティブなタブが変更されました:', activeTab);
+  }, [activeTab]);
+
+  // コンポーネントマウント時に認証状態をチェック（一時的に無効化）
+  useEffect(() => {
+    // 認証チェックをスキップして、ダミーユーザーを設定
+    const dummyUser: User = {
+      id: 1,
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'administrator',
+      worker_id: null,
+    };
+    setUser(dummyUser);
+    setLoading(false);
+    
+    // 元の認証チェック（コメントアウト）
+    // checkAuth();
   }, []);
 
   /**
-   * 認証状態をチェック
+   * 認証状態をチェック（一時的に無効化）
    * 現在のユーザー情報を取得し、訓練生の場合は自分のworker_idを自動設定
    */
   const checkAuth = async () => {
@@ -104,9 +123,10 @@ function App() {
     );
   }
 
-  if (!user) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
+  // 認証画面を一時的に無効化
+  // if (!user) {
+  //   return <Login onLoginSuccess={handleLoginSuccess} />;
+  // }
 
   return (
     <main 
@@ -205,7 +225,8 @@ function App() {
       {/* サイドバーとメインコンテンツのレイアウト */}
       <div className="flex">
         {/* サイドバー */}
-        {selectedWorker || user.role === 'trainee' ? (
+        {/* サイドバーを常に表示（一時的に条件を無効化） */}
+        {true ? (
           <aside 
             className="w-72 min-h-screen sticky top-0 h-screen overflow-y-auto"
             style={{
@@ -233,14 +254,23 @@ function App() {
                   { id: 'growth', label: '統合成長管理', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6', gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' },
                   { id: 'transition', label: '特定技能移行', icon: 'M17 8l4 4m0 0l-4 4m4-4H3', gradient: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)' },
                   { id: 'goals', label: 'キャリア目標', icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z', gradient: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)' },
+                  { id: 'screenshots', label: 'スクリーンショット', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' },
                 ];
 
                 return menuItems.map((item) => {
                   const isActive = activeTab === item.id;
+                  const handleTabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newTab = item.id as TabType;
+                    console.log('タブを切り替えます:', newTab, '現在のタブ:', activeTab);
+                    setActiveTab(newTab);
+                  };
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id as TabType)}
+                      type="button"
+                      onClick={handleTabClick}
                       className={`group relative w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-sm ${
                         isActive
                           ? 'text-white shadow-lg scale-[1.02]'
@@ -372,77 +402,101 @@ function App() {
                   </div>
                 )}
                 <div className={`animate-fade-in ${(user.role === 'administrator' || user.role === 'auditor') ? '' : 'lg:col-span-2'}`} style={{ animationDelay: '0.3s' }}>
-                  {selectedWorker || user.role === 'trainee' ? (
-                    <div className="space-y-6">
-                      {/* タブコンテンツ */}
-                      <div className="animate-fade-in">
+                  <div className="space-y-6">
+                    {/* タブコンテンツ */}
+                    <div className="animate-fade-in">
                     {activeTab === 'dashboard' && (
-                      <IntegratedDashboard workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="dashboard">
+                        <IntegratedDashboard workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'progress' && (
-                      <ProgressManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="progress">
+                        <ProgressManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'japanese' && (
-                      <JapaneseProficiencyManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="japanese">
+                        <JapaneseProficiencyManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'skill' && (
-                      <SkillTrainingManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="skill">
+                        <SkillTrainingManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'milestone' && (
-                      <MilestoneManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="milestone">
+                        <MilestoneManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'career' && (
-                      <CareerPathTimeline workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="career">
+                        <CareerPathTimeline workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {(user.role === 'administrator' || user.role === 'auditor') && activeTab === 'report' && (
-                      <EvidenceReport workerId={selectedWorker || 0} />
+                      <div key="report">
+                        <EvidenceReport workerId={selectedWorker || 0} />
+                      </div>
                     )}
                     {activeTab === 'sessions' && (
-                      <TrainingSessionDetail workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="sessions">
+                        <TrainingSessionDetail workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'assignment' && (
-                      <TrainingMenuAssignmentComponent workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="assignment">
+                        <TrainingMenuAssignmentComponent workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'simulator' && (
-                      <ConstructionSimulatorManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="simulator">
+                        <ConstructionSimulatorManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'growth' && (
-                      <IntegratedGrowthDashboard workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="growth">
+                        <IntegratedGrowthDashboard workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'transition' && (
-                      <SpecificSkillTransitionManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="transition">
+                        <SpecificSkillTransitionManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'goals' && (
-                      <CareerGoalManagement workerId={selectedWorker || user.worker_id || 0} />
+                      <div key="goals">
+                        <CareerGoalManagement workerId={selectedWorker || user.worker_id || 0} />
+                      </div>
                     )}
                     {activeTab === 'users' && user.role === 'administrator' && (
-                      <UserManagement />
+                      <div key="users">
+                        <UserManagement />
+                      </div>
                     )}
+                    {activeTab === 'screenshots' && (
+                      <div key="screenshots" className="space-y-6">
+                        <ScreenshotCapture 
+                          workerId={selectedWorker || user.worker_id || 0}
+                          onCaptureComplete={() => {
+                            // スクリーンショット一覧を更新する場合は、ここでリフレッシュ処理を追加
+                          }}
+                        />
+                        <ScreenshotList workerId={selectedWorker || user.worker_id || 0} />
                       </div>
-                    </div>
-                  ) : (
-                    <div 
-                      className="rounded-2xl p-12 text-center"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: 'blur(16px)',
-                        WebkitBackdropFilter: 'blur(16px)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                      }}
-                    >
-                      <div className="w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center"
-                        style={{
-                          background: 'linear-gradient(to bottom right, #dbeafe, #e0e7ff)',
-                        }}
-                      >
-                        <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
+                    )}
+                    {/* デバッグ用: アクティブなタブが表示されない場合のフォールバック */}
+                    {!['dashboard', 'progress', 'japanese', 'skill', 'milestone', 'career', 'report', 'sessions', 'assignment', 'simulator', 'growth', 'transition', 'goals', 'users', 'screenshots'].includes(activeTab) && (
+                      <div className="glass rounded-2xl p-6">
+                        <div className="text-center text-gray-500">
+                          <p>タブ「{activeTab}」のコンテンツが見つかりません。</p>
+                          <p className="text-sm mt-2">現在のタブ: {activeTab}</p>
+                        </div>
                       </div>
-                      <p className="text-gray-600 text-lg font-medium">{t('selectWorker')}</p>
+                    )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>

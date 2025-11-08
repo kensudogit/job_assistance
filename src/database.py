@@ -923,40 +923,42 @@ class Database:
         if parsed_url.hostname:
             # hostnameが存在する場合、常にTCP/IP接続を強制
             # hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
-            connect_args['host'] = parsed_url.hostname
-            
-            # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
-            # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
-            try:
-                host_ip = socket.gethostbyname(parsed_url.hostname)
-                connect_args['hostaddr'] = host_ip
-            except socket.gaierror:
-                # DNS解決に失敗した場合、hostaddrを設定しない（hostのみを使用）
-                pass
-            
-            if parsed_url.port:
-                connect_args['port'] = parsed_url.port
-            else:
-                # ポートが指定されていない場合、デフォルトの5432を使用
-                connect_args['port'] = 5432
-            # userとpasswordも明示的に指定（URLに含まれている場合）
-            if parsed_url.username:
-                connect_args['user'] = parsed_url.username
-            if parsed_url.password:
-                connect_args['password'] = parsed_url.password
-            # database名も明示的に指定
-            if parsed_url.path:
-                db_name = parsed_url.path.lstrip('/')
-                if db_name:
-                    connect_args['dbname'] = db_name
-            
-            # URLを再構築して、connect_argsで指定したパラメータと一致させる
-            # これにより、SQLAlchemyがURLから直接接続パラメータを取得することを防ぐ
-            # また、URLにhostが含まれていることを確認することで、psycopg2がUnixソケット接続を試みることを防ぐ
-            # クエリパラメータも保持する
-            query_string = f"?{parsed_url.query}" if parsed_url.query else ""
-            # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定
-            db_url = f"postgresql+psycopg2://{parsed_url.username}:{parsed_url.password}@{parsed_url.hostname}:{parsed_url.port or 5432}{parsed_url.path}{query_string}"
+            # hostnameがlocalhostや127.0.0.1でない場合のみ、TCP/IP接続を強制
+            if parsed_url.hostname not in ['localhost', '127.0.0.1']:
+                connect_args['host'] = parsed_url.hostname
+                
+                # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
+                # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
+                try:
+                    host_ip = socket.gethostbyname(parsed_url.hostname)
+                    connect_args['hostaddr'] = host_ip
+                except socket.gaierror:
+                    # DNS解決に失敗した場合、hostaddrを設定しない（hostのみを使用）
+                    pass
+                
+                if parsed_url.port:
+                    connect_args['port'] = parsed_url.port
+                else:
+                    # ポートが指定されていない場合、デフォルトの5432を使用
+                    connect_args['port'] = 5432
+                # userとpasswordも明示的に指定（URLに含まれている場合）
+                if parsed_url.username:
+                    connect_args['user'] = parsed_url.username
+                if parsed_url.password:
+                    connect_args['password'] = parsed_url.password
+                # database名も明示的に指定
+                if parsed_url.path:
+                    db_name = parsed_url.path.lstrip('/')
+                    if db_name:
+                        connect_args['dbname'] = db_name
+                
+                # URLを再構築して、connect_argsで指定したパラメータと一致させる
+                # これにより、SQLAlchemyがURLから直接接続パラメータを取得することを防ぐ
+                # また、URLにhostが含まれていることを確認することで、psycopg2がUnixソケット接続を試みることを防ぐ
+                # クエリパラメータも保持する
+                query_string = f"?{parsed_url.query}" if parsed_url.query else ""
+                # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定
+                db_url = f"postgresql+psycopg2://{parsed_url.username}:{parsed_url.password}@{parsed_url.hostname}:{parsed_url.port or 5432}{parsed_url.path}{query_string}"
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
         # connect_argsで指定したパラメータが優先される

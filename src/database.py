@@ -931,10 +931,20 @@ class Database:
             import socket
             
             # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
-            try:
-                host_ip = socket.gethostbyname(parsed_url.hostname)
-            except (socket.gaierror, OSError):
-                host_ip = None
+            # 複数回試行して、確実にIPアドレスを取得
+            host_ip = None
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    host_ip = socket.gethostbyname(parsed_url.hostname)
+                    break
+                except (socket.gaierror, OSError) as e:
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(0.1)  # 少し待ってから再試行
+                    else:
+                        # 最終的に取得できない場合、Noneのまま
+                        pass
             
             # 接続パラメータを構築
             # hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
@@ -957,30 +967,39 @@ class Database:
                 # localhostや127.0.0.1の場合、IPアドレスを直接指定
                 conn_params['hostaddr'] = '127.0.0.1'
             else:
-                # hostaddrが取得できない場合でも、hostnameをIPアドレスとして使用
-                # これにより、psycopg2がUnixソケット接続を試みることを防ぐ
-                # 注意: hostnameがIPアドレスでない場合、psycopg2は接続時に解決を試みる
-                # しかし、hostとhostaddrの両方が設定されている場合、TCP/IP接続が強制される
-                # ここでは、hostを指定することでTCP/IP接続を強制
-                # hostaddrは設定しないが、hostを明示的に指定することでUnixソケット接続を回避
-                # さらに、hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
-                # 注意: hostが指定されている場合、psycopg2はデフォルトでTCP/IP接続を使用する
-                # しかし、Unixソケット接続を試みることがあるため、hostaddrを設定する必要がある
-                # ここでは、hostを指定することでTCP/IP接続を強制
-                # ただし、hostaddrが取得できない場合、接続時にhostnameが解決される
-                pass
+                # hostaddrが取得できない場合でも、hostnameがIPアドレス形式かどうかを確認
+                import re
+                ip_pattern = re.compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+                if ip_pattern.match(parsed_url.hostname):
+                    # hostnameが既にIPアドレスの場合、hostaddrとして使用
+                    conn_params['hostaddr'] = parsed_url.hostname
+                else:
+                    # サービス名（例: 'db'）の場合、接続時に解決されるため、hostaddrを設定しない
+                    # しかし、hostを明示的に指定することでTCP/IP接続を強制
+                    # さらに、psycopg2がUnixソケット接続を試みないようにするため、
+                    # hostを明示的に指定し、portも明示的に指定することでTCP/IP接続を強制
+                    # 注意: hostaddrが設定されていない場合でも、hostとportが指定されていれば
+                    # psycopg2はTCP/IP接続を使用するが、Unixソケット接続を試みることがある
+                    # そのため、可能な限りhostaddrを設定する
+                    # ここでは、hostとportを明示的に指定することでTCP/IP接続を強制
+                    pass
             
             # creator関数を定義（変数として明示的に保持）
             # デバッグ用: 接続パラメータをログ出力
             import logging
             logger = logging.getLogger(__name__)
-            logger.debug(f"PostgreSQL接続パラメータ: host={conn_params.get('host')}, hostaddr={conn_params.get('hostaddr')}, port={conn_params.get('port')}")
+            logger.info(f"PostgreSQL接続パラメータ: host={conn_params.get('host')}, hostaddr={conn_params.get('hostaddr')}, port={conn_params.get('port')}")
             
             def _creator():
                 # psycopg2.connect()を呼び出す際、hostが指定されている場合、
                 # デフォルトでTCP/IP接続を使用するが、Unixソケット接続を試みることがある
                 # hostaddrを設定することで、確実にTCP/IP接続を強制
-                return psycopg2.connect(**conn_params)
+                # さらに、hostを明示的に指定することで、Unixソケット接続を完全に回避
+                try:
+                    return psycopg2.connect(**conn_params)
+                except Exception as e:
+                    logger.error(f"PostgreSQL接続エラー: {e}, パラメータ: {conn_params}")
+                    raise
             creator_func = _creator
             
             # connect_argsではなく、creatorを使用

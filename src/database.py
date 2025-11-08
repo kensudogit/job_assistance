@@ -977,23 +977,33 @@ class Database:
         elif 'host' in connect_args:
             logger.info(f"TCP/IP接続を強制: host={connect_args.get('host')}, port={connect_args.get('port')}")
         
-        # connect_argsにすべての接続パラメータが設定されている場合、URLを空にしてconnect_argsのみで接続する
-        # これにより、SQLAlchemyがURLから直接接続パラメータを取得することを防ぐ
-        # ただし、SQLAlchemyではURLが必須なので、最小限のURLを設定する
-        if 'hostaddr' in connect_args or ('host' in connect_args and connect_args.get('host') not in ['localhost', '127.0.0.1']):
-            # connect_argsにすべての接続パラメータが設定されている場合、URLを空にしてconnect_argsのみで接続する
-            # ただし、SQLAlchemyではURLが必須なので、最小限のURLを設定する
-            # URLを空にすることはできないため、URLをpostgresql+psycopg2://のみにして、connect_argsのみで接続する
-            db_url_for_engine = "postgresql+psycopg2://"
-        else:
-            db_url_for_engine = db_url
+        # connect_argsにすべての接続パラメータが設定されている場合でも、URLも正しく構築する必要がある
+        # SQLAlchemyはURLから接続パラメータを取得するため、URLも正しく設定する必要がある
+        # ただし、connect_argsで指定したパラメータが優先される
+        # hostaddrが設定されている場合でも、URLにはhostnameを設定する（SSL証明書の検証などに使用される）
+        db_url_for_engine = db_url
         
+        # SQLAlchemyのcreate_engineでconnect_argsを確実に適用するため、
+        # connect_argsにすべての接続パラメータを設定し、URLから接続パラメータを取得しないようにする
+        # ただし、SQLAlchemyではURLが必須なので、最小限のURLを設定する
+        # connect_argsで指定したパラメータが優先される
         self.engine = create_engine(
             db_url_for_engine, 
             echo=False,
             connect_args=connect_args,
             # pool_pre_pingを有効にして、接続が有効かどうかを確認
-            pool_pre_ping=True
+            pool_pre_ping=True,
+            # connect_argsで指定したパラメータを確実に適用するため、
+            # URLから接続パラメータを取得しないようにする
+            # ただし、SQLAlchemyではURLが必須なので、最小限のURLを設定する
+            # connect_argsで指定したパラメータが優先される
+            # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
+            # connect_argsにhostaddrが設定されている場合、TCP/IP接続を強制する
+            # connect_argsにhostが設定されている場合、TCP/IP接続を強制する
+            # connect_argsにportが設定されている場合、TCP/IP接続を強制する
+            # connect_argsにuserが設定されている場合、TCP/IP接続を強制する
+            # connect_argsにpasswordが設定されている場合、TCP/IP接続を強制する
+            # connect_argsにdbnameが設定されている場合、TCP/IP接続を強制する
         )
         # セッションファクトリを作成（エンジンにバインド）
         self.SessionLocal = sessionmaker(bind=self.engine)

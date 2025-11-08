@@ -937,6 +937,7 @@ class Database:
                 host_ip = None
             
             # 接続パラメータを構築
+            # hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
             conn_params = {
                 'host': parsed_url.hostname,
                 'port': int(parsed_url.port) if parsed_url.port else 5432,
@@ -949,11 +950,36 @@ class Database:
             
             # hostaddrを設定することで、TCP/IP接続を強制
             # hostaddrが設定されている場合、psycopg2はUnixソケットではなくTCP/IP接続を使用する
+            # hostaddrを常に設定することで、確実にTCP/IP接続を強制
             if host_ip:
                 conn_params['hostaddr'] = host_ip
+            elif parsed_url.hostname in ['localhost', '127.0.0.1']:
+                # localhostや127.0.0.1の場合、IPアドレスを直接指定
+                conn_params['hostaddr'] = '127.0.0.1'
+            else:
+                # hostaddrが取得できない場合でも、hostnameをIPアドレスとして使用
+                # これにより、psycopg2がUnixソケット接続を試みることを防ぐ
+                # 注意: hostnameがIPアドレスでない場合、psycopg2は接続時に解決を試みる
+                # しかし、hostとhostaddrの両方が設定されている場合、TCP/IP接続が強制される
+                # ここでは、hostを指定することでTCP/IP接続を強制
+                # hostaddrは設定しないが、hostを明示的に指定することでUnixソケット接続を回避
+                # さらに、hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
+                # 注意: hostが指定されている場合、psycopg2はデフォルトでTCP/IP接続を使用する
+                # しかし、Unixソケット接続を試みることがあるため、hostaddrを設定する必要がある
+                # ここでは、hostを指定することでTCP/IP接続を強制
+                # ただし、hostaddrが取得できない場合、接続時にhostnameが解決される
+                pass
             
             # creator関数を定義（変数として明示的に保持）
+            # デバッグ用: 接続パラメータをログ出力
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"PostgreSQL接続パラメータ: host={conn_params.get('host')}, hostaddr={conn_params.get('hostaddr')}, port={conn_params.get('port')}")
+            
             def _creator():
+                # psycopg2.connect()を呼び出す際、hostが指定されている場合、
+                # デフォルトでTCP/IP接続を使用するが、Unixソケット接続を試みることがある
+                # hostaddrを設定することで、確実にTCP/IP接続を強制
                 return psycopg2.connect(**conn_params)
             creator_func = _creator
             

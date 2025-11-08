@@ -906,6 +906,7 @@ class Database:
         parsed_url = urlparse(db_url)
         
         # connect_argsでUnixソケットではなくTCP/IP接続を強制
+        # psycopg2に直接渡すパラメータを構築
         connect_args = {
             'connect_timeout': 10,
             'options': '-c statement_timeout=30000'
@@ -913,7 +914,8 @@ class Database:
         
         # hostnameが指定されている場合、明示的にhostとportを指定してUnixソケットを回避
         # Railwayなどのクラウド環境では、hostnameが必ず設定されている
-        if parsed_url.hostname:
+        if parsed_url.hostname and parsed_url.hostname not in ['localhost', '127.0.0.1']:
+            # リモートホストの場合、TCP/IP接続を強制
             connect_args['host'] = parsed_url.hostname
             if parsed_url.port:
                 connect_args['port'] = parsed_url.port
@@ -927,8 +929,13 @@ class Database:
                 db_name = parsed_url.path.lstrip('/')
                 if db_name:
                     connect_args['dbname'] = db_name
+            
+            # URLを再構築して、connect_argsで指定したパラメータと一致させる
+            # これにより、SQLAlchemyがURLから直接接続パラメータを取得することを防ぐ
+            db_url = f"postgresql://{parsed_url.username}:{parsed_url.password}@{parsed_url.hostname}:{parsed_url.port or 5432}{parsed_url.path}"
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
+        # connect_argsで指定したパラメータが優先される
         self.engine = create_engine(
             db_url, 
             echo=False,

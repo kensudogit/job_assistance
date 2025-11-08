@@ -912,13 +912,16 @@ class Database:
             'options': '-c statement_timeout=30000'
         }
         
-        # hostnameが指定されている場合、明示的にhostとportを指定してUnixソケットを回避
+        # hostnameが指定されている場合、常に明示的にhostとportを指定してUnixソケットを回避
         # Railwayなどのクラウド環境では、hostnameが必ず設定されている
-        if parsed_url.hostname and parsed_url.hostname not in ['localhost', '127.0.0.1']:
-            # リモートホストの場合、TCP/IP接続を強制
+        if parsed_url.hostname:
+            # hostnameが存在する場合、常にTCP/IP接続を強制
             connect_args['host'] = parsed_url.hostname
             if parsed_url.port:
                 connect_args['port'] = parsed_url.port
+            else:
+                # ポートが指定されていない場合、デフォルトの5432を使用
+                connect_args['port'] = 5432
             # userとpasswordも明示的に指定（URLに含まれている場合）
             if parsed_url.username:
                 connect_args['user'] = parsed_url.username

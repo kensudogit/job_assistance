@@ -918,6 +918,9 @@ class Database:
             'options': '-c statement_timeout=30000'
         }
         
+        # creator関数を初期化（Noneの場合は使用しない）
+        creator_func = None
+        
         # hostnameが指定されている場合、常に明示的にhostとportを指定してUnixソケットを回避
         # Railwayなどのクラウド環境では、hostnameが必ず設定されている
         if parsed_url.hostname:
@@ -932,7 +935,7 @@ class Database:
                 # 接続パラメータを構築
                 conn_params = {
                     'host': parsed_url.hostname,
-                    'port': parsed_url.port or 5432,
+                    'port': int(parsed_url.port) if parsed_url.port else 5432,
                     'user': parsed_url.username,
                     'password': parsed_url.password,
                     'dbname': parsed_url.path.lstrip('/') if parsed_url.path else 'postgres',
@@ -940,50 +943,31 @@ class Database:
                     'options': '-c statement_timeout=30000'
                 }
                 
-                # creator関数を定義
-                def creator():
+                # creator関数を定義（変数として明示的に保持）
+                def _creator():
                     return psycopg2.connect(**conn_params)
+                creator_func = _creator
                 
                 # connect_argsではなく、creatorを使用
                 connect_args = None
                 db_url = "postgresql+psycopg2://"
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
-        # connect_argsで指定したパラメータが優先される
-        # ただし、URLにもhostが含まれていることを確認することで、psycopg2がUnixソケット接続を試みることを防ぐ
-        # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定し、connect_argsを確実に適用
-        # connect_argsにhostaddrが設定されている場合、URLにもhostを設定して、TCP/IP接続を強制する
-        # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
-        # デバッグ用：接続パラメータをログに出力（本番環境では削除推奨）
-        import logging
-        logger = logging.getLogger(__name__)
-        if 'hostaddr' in connect_args:
-            logger.info(f"TCP/IP接続を強制: host={connect_args.get('host')}, hostaddr={connect_args.get('hostaddr')}, port={connect_args.get('port')}")
-        elif 'host' in connect_args:
-            logger.info(f"TCP/IP接続を強制: host={connect_args.get('host')}, port={connect_args.get('port')}")
-        
-        # connect_argsにすべての接続パラメータが設定されている場合でも、URLも正しく構築する必要がある
-        # SQLAlchemyはURLから接続パラメータを取得するため、URLも正しく設定する必要がある
-        # ただし、connect_argsで指定したパラメータが優先される
-        # hostaddrが設定されている場合でも、URLにはhostnameを設定する（SSL証明書の検証などに使用される）
-        db_url_for_engine = db_url
-        
-        # SQLAlchemyのcreate_engineでcreator関数を使用して、psycopg2の接続を直接制御
-        # これにより、SQLAlchemyがURLから接続パラメータを取得することを完全に防ぐ
         # creator関数が定義されている場合、それを使用。そうでない場合、connect_argsを使用
-        if connect_args is None and 'creator' in locals():
-            # creator関数を使用
+        if creator_func is not None:
+            # creator関数を使用して、psycopg2の接続を直接制御
+            # これにより、SQLAlchemyがURLから接続パラメータを取得することを完全に防ぐ
             self.engine = create_engine(
-                db_url_for_engine, 
+                db_url, 
                 echo=False,
-                creator=creator,
+                creator=creator_func,
                 # pool_pre_pingを有効にして、接続が有効かどうかを確認
                 pool_pre_ping=True
             )
         else:
             # connect_argsを使用
             self.engine = create_engine(
-                db_url_for_engine, 
+                db_url, 
                 echo=False,
                 connect_args=connect_args,
                 # pool_pre_pingを有効にして、接続が有効かどうかを確認

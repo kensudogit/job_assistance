@@ -931,6 +931,13 @@ class Database:
                 # creator関数を使用して、psycopg2の接続を直接制御
                 # これにより、SQLAlchemyがURLから接続パラメータを取得することを完全に防ぐ
                 import psycopg2
+                import socket
+                
+                # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
+                try:
+                    host_ip = socket.gethostbyname(parsed_url.hostname)
+                except (socket.gaierror, OSError):
+                    host_ip = None
                 
                 # 接続パラメータを構築
                 conn_params = {
@@ -942,6 +949,10 @@ class Database:
                     'connect_timeout': 10,
                     'options': '-c statement_timeout=30000'
                 }
+                
+                # hostaddrを設定することで、TCP/IP接続を強制
+                if host_ip:
+                    conn_params['hostaddr'] = host_ip
                 
                 # creator関数を定義（変数として明示的に保持）
                 def _creator():

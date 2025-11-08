@@ -9,6 +9,7 @@ from datetime import datetime
 import os
 import hashlib
 import secrets
+import socket
 from urllib.parse import urlparse
 
 Base = declarative_base()
@@ -923,6 +924,16 @@ class Database:
             # hostnameが存在する場合、常にTCP/IP接続を強制
             # hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
             connect_args['host'] = parsed_url.hostname
+            
+            # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
+            # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
+            try:
+                host_ip = socket.gethostbyname(parsed_url.hostname)
+                connect_args['hostaddr'] = host_ip
+            except socket.gaierror:
+                # DNS解決に失敗した場合、hostaddrを設定しない（hostのみを使用）
+                pass
+            
             if parsed_url.port:
                 connect_args['port'] = parsed_url.port
             else:

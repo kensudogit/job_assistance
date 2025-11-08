@@ -922,46 +922,44 @@ class Database:
         creator_func = None
         
         # hostnameが指定されている場合、常に明示的にhostとportを指定してUnixソケットを回避
-        # Railwayなどのクラウド環境では、hostnameが必ず設定されている
+        # Dockerコンテナやクラウド環境では、常にTCP/IP接続を使用する必要がある
         if parsed_url.hostname:
             # hostnameが存在する場合、常にTCP/IP接続を強制
             # hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
-            # hostnameがlocalhostや127.0.0.1でない場合のみ、TCP/IP接続を強制
-            if parsed_url.hostname not in ['localhost', '127.0.0.1']:
-                # creator関数を使用して、psycopg2の接続を直接制御
-                # これにより、SQLAlchemyがURLから接続パラメータを取得することを完全に防ぐ
-                import psycopg2
-                import socket
-                
-                # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
-                try:
-                    host_ip = socket.gethostbyname(parsed_url.hostname)
-                except (socket.gaierror, OSError):
-                    host_ip = None
-                
-                # 接続パラメータを構築
-                conn_params = {
-                    'host': parsed_url.hostname,
-                    'port': int(parsed_url.port) if parsed_url.port else 5432,
-                    'user': parsed_url.username,
-                    'password': parsed_url.password,
-                    'dbname': parsed_url.path.lstrip('/') if parsed_url.path else 'postgres',
-                    'connect_timeout': 10,
-                    'options': '-c statement_timeout=30000'
-                }
-                
-                # hostaddrを設定することで、TCP/IP接続を強制
-                if host_ip:
-                    conn_params['hostaddr'] = host_ip
-                
-                # creator関数を定義（変数として明示的に保持）
-                def _creator():
-                    return psycopg2.connect(**conn_params)
-                creator_func = _creator
-                
-                # connect_argsではなく、creatorを使用
-                connect_args = None
-                db_url = "postgresql+psycopg2://"
+            # Dockerコンテナ内では、localhostでもTCP/IP接続が必要
+            import psycopg2
+            import socket
+            
+            # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
+            try:
+                host_ip = socket.gethostbyname(parsed_url.hostname)
+            except (socket.gaierror, OSError):
+                host_ip = None
+            
+            # 接続パラメータを構築
+            conn_params = {
+                'host': parsed_url.hostname,
+                'port': int(parsed_url.port) if parsed_url.port else 5432,
+                'user': parsed_url.username,
+                'password': parsed_url.password,
+                'dbname': parsed_url.path.lstrip('/') if parsed_url.path else 'postgres',
+                'connect_timeout': 10,
+                'options': '-c statement_timeout=30000'
+            }
+            
+            # hostaddrを設定することで、TCP/IP接続を強制
+            # hostaddrが設定されている場合、psycopg2はUnixソケットではなくTCP/IP接続を使用する
+            if host_ip:
+                conn_params['hostaddr'] = host_ip
+            
+            # creator関数を定義（変数として明示的に保持）
+            def _creator():
+                return psycopg2.connect(**conn_params)
+            creator_func = _creator
+            
+            # connect_argsではなく、creatorを使用
+            connect_args = None
+            db_url = "postgresql+psycopg2://"
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
         # creator関数が定義されている場合、それを使用。そうでない場合、connect_argsを使用

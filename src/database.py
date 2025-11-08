@@ -929,11 +929,13 @@ class Database:
                 
                 # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
                 # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
+                # hostaddrを設定することで、psycopg2がUnixソケット接続を試みることを完全に防ぐ
                 try:
                     host_ip = socket.gethostbyname(parsed_url.hostname)
                     connect_args['hostaddr'] = host_ip
-                except socket.gaierror:
+                except (socket.gaierror, OSError):
                     # DNS解決に失敗した場合、hostaddrを設定しない（hostのみを使用）
+                    # ただし、hostaddrが設定されていない場合でも、hostを設定することで、TCP/IP接続を強制できる
                     pass
                 
                 if parsed_url.port:
@@ -964,6 +966,8 @@ class Database:
         # connect_argsで指定したパラメータが優先される
         # ただし、URLにもhostが含まれていることを確認することで、psycopg2がUnixソケット接続を試みることを防ぐ
         # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定し、connect_argsを確実に適用
+        # connect_argsにhostaddrが設定されている場合、URLにもhostを設定して、TCP/IP接続を強制する
+        # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
         self.engine = create_engine(
             db_url, 
             echo=False,

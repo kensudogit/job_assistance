@@ -9,6 +9,7 @@ from datetime import datetime
 import os
 import hashlib
 import secrets
+from urllib.parse import urlparse
 
 Base = declarative_base()
 
@@ -895,9 +896,44 @@ class Database:
                 db_password = os.getenv('DB_PASSWORD', 'postgres').strip()
                 # PostgreSQL接続URLを構築
                 db_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+            else:
+                # Railwayなどの場合、postgres://をpostgresql://に変換
+                if db_url.startswith('postgres://'):
+                    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        
+        # DATABASE_URLを解析して、TCP/IP接続を強制
+        # Railwayなどのクラウド環境では、UnixソケットではなくTCP/IP接続を使用する必要がある
+        parsed_url = urlparse(db_url)
+        
+        # connect_argsでUnixソケットではなくTCP/IP接続を強制
+        connect_args = {
+            'connect_timeout': 10,
+            'options': '-c statement_timeout=30000'
+        }
+        
+        # hostnameが指定されている場合、明示的にhostとportを指定してUnixソケットを回避
+        # Railwayなどのクラウド環境では、hostnameが必ず設定されている
+        if parsed_url.hostname:
+            connect_args['host'] = parsed_url.hostname
+            if parsed_url.port:
+                connect_args['port'] = parsed_url.port
+            # userとpasswordも明示的に指定（URLに含まれている場合）
+            if parsed_url.username:
+                connect_args['user'] = parsed_url.username
+            if parsed_url.password:
+                connect_args['password'] = parsed_url.password
+            # database名も明示的に指定
+            if parsed_url.path:
+                db_name = parsed_url.path.lstrip('/')
+                if db_name:
+                    connect_args['dbname'] = db_name
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
-        self.engine = create_engine(db_url, echo=False)
+        self.engine = create_engine(
+            db_url, 
+            echo=False,
+            connect_args=connect_args
+        )
         # セッションファクトリを作成（エンジンにバインド）
         self.SessionLocal = sessionmaker(bind=self.engine)
         self.db_url = db_url

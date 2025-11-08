@@ -939,7 +939,7 @@ class Database:
                     connect_args['host'] = parsed_url.hostname
                 
                 if parsed_url.port:
-                    connect_args['port'] = parsed_url.port
+                    connect_args['port'] = int(parsed_url.port)
                 else:
                     # ポートが指定されていない場合、デフォルトの5432を使用
                     connect_args['port'] = 5432
@@ -969,8 +969,27 @@ class Database:
         # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定し、connect_argsを確実に適用
         # connect_argsにhostaddrが設定されている場合、URLにもhostを設定して、TCP/IP接続を強制する
         # これにより、psycopg2がUnixソケット接続を試みることを完全に防ぐ
+        # デバッグ用：接続パラメータをログに出力（本番環境では削除推奨）
+        import logging
+        logger = logging.getLogger(__name__)
+        if 'hostaddr' in connect_args:
+            logger.info(f"TCP/IP接続を強制: host={connect_args.get('host')}, hostaddr={connect_args.get('hostaddr')}, port={connect_args.get('port')}")
+        elif 'host' in connect_args:
+            logger.info(f"TCP/IP接続を強制: host={connect_args.get('host')}, port={connect_args.get('port')}")
+        
+        # connect_argsにすべての接続パラメータが設定されている場合、URLを空にしてconnect_argsのみで接続する
+        # これにより、SQLAlchemyがURLから直接接続パラメータを取得することを防ぐ
+        # ただし、SQLAlchemyではURLが必須なので、最小限のURLを設定する
+        if 'hostaddr' in connect_args or ('host' in connect_args and connect_args.get('host') not in ['localhost', '127.0.0.1']):
+            # connect_argsにすべての接続パラメータが設定されている場合、URLを空にしてconnect_argsのみで接続する
+            # ただし、SQLAlchemyではURLが必須なので、最小限のURLを設定する
+            # URLを空にすることはできないため、URLをpostgresql+psycopg2://のみにして、connect_argsのみで接続する
+            db_url_for_engine = "postgresql+psycopg2://"
+        else:
+            db_url_for_engine = db_url
+        
         self.engine = create_engine(
-            db_url, 
+            db_url_for_engine, 
             echo=False,
             connect_args=connect_args,
             # pool_pre_pingを有効にして、接続が有効かどうかを確認

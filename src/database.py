@@ -895,11 +895,16 @@ class Database:
                 db_user = os.getenv('DB_USER', 'postgres').strip()
                 db_password = os.getenv('DB_PASSWORD', 'postgres').strip()
                 # PostgreSQL接続URLを構築
-                db_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+                # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定し、connect_argsを確実に適用
+                db_url = f'postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
             else:
-                # Railwayなどの場合、postgres://をpostgresql://に変換
+                # Railwayなどの場合、postgres://をpostgresql+psycopg2://に変換
+                # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定し、connect_argsを確実に適用
                 if db_url.startswith('postgres://'):
-                    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+                    db_url = db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+                elif db_url.startswith('postgresql://'):
+                    # postgresql://をpostgresql+psycopg2://に変換
+                    db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
         
         # DATABASE_URLを解析して、TCP/IP接続を強制
         # Railwayなどのクラウド環境では、UnixソケットではなくTCP/IP接続を使用する必要がある
@@ -916,6 +921,7 @@ class Database:
         # Railwayなどのクラウド環境では、hostnameが必ず設定されている
         if parsed_url.hostname:
             # hostnameが存在する場合、常にTCP/IP接続を強制
+            # hostを明示的に指定することで、psycopg2がUnixソケット接続を試みることを防ぐ
             connect_args['host'] = parsed_url.hostname
             if parsed_url.port:
                 connect_args['port'] = parsed_url.port
@@ -935,14 +941,22 @@ class Database:
             
             # URLを再構築して、connect_argsで指定したパラメータと一致させる
             # これにより、SQLAlchemyがURLから直接接続パラメータを取得することを防ぐ
-            db_url = f"postgresql://{parsed_url.username}:{parsed_url.password}@{parsed_url.hostname}:{parsed_url.port or 5432}{parsed_url.path}"
+            # また、URLにhostが含まれていることを確認することで、psycopg2がUnixソケット接続を試みることを防ぐ
+            # クエリパラメータも保持する
+            query_string = f"?{parsed_url.query}" if parsed_url.query else ""
+            # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定
+            db_url = f"postgresql+psycopg2://{parsed_url.username}:{parsed_url.password}@{parsed_url.hostname}:{parsed_url.port or 5432}{parsed_url.path}{query_string}"
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
         # connect_argsで指定したパラメータが優先される
+        # ただし、URLにもhostが含まれていることを確認することで、psycopg2がUnixソケット接続を試みることを防ぐ
+        # postgresql+psycopg2://を使用することで、psycopg2を明示的に指定し、connect_argsを確実に適用
         self.engine = create_engine(
             db_url, 
             echo=False,
-            connect_args=connect_args
+            connect_args=connect_args,
+            # pool_pre_pingを有効にして、接続が有効かどうかを確認
+            pool_pre_ping=True
         )
         # セッションファクトリを作成（エンジンにバインド）
         self.SessionLocal = sessionmaker(bind=self.engine)

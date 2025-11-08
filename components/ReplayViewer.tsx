@@ -463,14 +463,36 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
             {currentLogs.length > 0 ? (
               <div className="space-y-2">
                 {currentLogs.slice(-20).map((log, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <span className="text-gray-500">{new Date(log.timestamp || '').toLocaleTimeString()}</span>
-                    <span className="text-blue-400">{log.operation_type || '操作'}</span>
-                    {log.operation_value && (
-                      <span className="text-yellow-400">: {log.operation_value}</span>
+                  <div key={index} className="flex flex-col gap-1 p-2 bg-gray-800/50 rounded">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500">{new Date(log.timestamp || '').toLocaleTimeString()}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                        log.event_type === 'error' ? 'bg-red-900 text-red-300' :
+                        log.event_type === 'achievement' ? 'bg-green-900 text-green-300' :
+                        'bg-blue-900 text-blue-300'
+                      }`}>
+                        {log.event_type === 'error' ? 'エラー' :
+                         log.event_type === 'achievement' ? '達成' :
+                         '操作'}
+                      </span>
+                      <span className="text-blue-400">{log.operation_type || '操作'}</span>
+                      {log.operation_value && (
+                        <span className="text-yellow-400">: {log.operation_value}</span>
+                      )}
+                    </div>
+                    {log.error_event && log.error_description && (
+                      <div className="text-red-400 text-xs ml-4">⚠ エラー: {log.error_description}</div>
                     )}
-                    {log.error_event && (
-                      <span className="text-red-400">⚠ エラー: {log.error_description}</span>
+                    {log.achievement_event && log.achievement_description && (
+                      <div className="text-green-400 text-xs ml-4">✓ 達成: {log.achievement_description}</div>
+                    )}
+                    {log.state_log && (
+                      <div className="text-gray-400 text-xs ml-4">
+                        位置: ({log.state_log.position?.x?.toFixed(2) || 'N/A'}, {log.state_log.position?.y?.toFixed(2) || 'N/A'}, {log.state_log.position?.z?.toFixed(2) || 'N/A'})
+                        {log.state_log.velocity !== undefined && (
+                          <span className="ml-2">速度: {log.state_log.velocity.toFixed(2)}</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -566,28 +588,35 @@ export default function ReplayViewer({ sessionId }: ReplayViewerProps) {
             </div>
           )}
 
-          {/* KPIタイムライン */}
-          {replayData.kpi_timeline && replayData.kpi_timeline.length > 0 && (
-            <div className="glass rounded-2xl p-6 shadow-xl card-hover">
-              <h3 className="text-xl font-bold mb-4">KPIタイムライン</h3>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {replayData.kpi_timeline.map((kpi, index) => (
-                  <div key={index} className={`p-3 rounded-lg ${
-                    kpi.error_event ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
-                  }`}>
-                    <div className="text-xs text-gray-600 mb-1">
-                      {new Date(kpi.timestamp).toLocaleTimeString()}
-                    </div>
-                    {kpi.error_event && (
-                      <div className="text-sm text-red-700 font-semibold">
-                        ⚠ {kpi.error_description}
+              {/* KPIタイムライン */}
+              {replayData.kpi_timeline && replayData.kpi_timeline.length > 0 && (
+                <div className="glass rounded-2xl p-6 shadow-xl card-hover">
+                  <h3 className="text-xl font-bold mb-4">KPIタイムライン</h3>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {replayData.kpi_timeline.map((kpi, index) => (
+                      <div key={index} className={`p-3 rounded-lg ${
+                        kpi.error_event ? 'bg-red-50 border border-red-200' : 
+                        kpi.achievement_event ? 'bg-green-50 border border-green-200' : 
+                        'bg-gray-50'
+                      }`}>
+                        <div className="text-xs text-gray-600 mb-1">
+                          {new Date(kpi.timestamp).toLocaleTimeString()}
+                        </div>
+                        {kpi.error_event && kpi.error_description && (
+                          <div className="text-sm text-red-700 font-semibold">
+                            ⚠ エラー: {kpi.error_description}
+                          </div>
+                        )}
+                        {kpi.achievement_event && kpi.achievement_description && (
+                          <div className="text-sm text-green-700 font-semibold">
+                            ✓ 達成: {kpi.achievement_description}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
         </div>
       </div>
     </div>

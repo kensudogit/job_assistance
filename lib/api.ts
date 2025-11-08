@@ -1007,11 +1007,29 @@ export const userApi = {
 // リプレイAPI
 export interface ReplayData {
   session_id: string;
-  worker_id: number;
+  worker_id: number | null;
   session_start_time: string;
   session_end_time: string;
   duration_seconds: number;
-  operation_logs: any[];
+  operation_logs: Array<{
+    timestamp: string;
+    operation_type?: string;
+    operation_value?: any;
+    error_event?: boolean;
+    error_description?: string;
+    achievement_event?: boolean;
+    achievement_description?: string;
+    event_type?: 'operation' | 'error' | 'achievement';
+    state_log?: {
+      position?: {
+        x?: number;
+        y?: number;
+        z?: number;
+      };
+      velocity?: number;
+    };
+    equipment_state?: any;
+  }>;
   ai_evaluation: any;
   replay_data: any;
   kpi_scores?: {
@@ -1026,8 +1044,10 @@ export interface ReplayData {
   };
   kpi_timeline?: Array<{
     timestamp: string;
-    error_event: boolean;
+    error_event?: boolean;
     error_description?: string;
+    achievement_event?: boolean;
+    achievement_description?: string;
   }>;
 }
 

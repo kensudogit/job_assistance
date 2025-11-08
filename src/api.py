@@ -37,6 +37,13 @@ from sqlalchemy import or_
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+import base64
+try:
+    import msgpack
+    MSGPACK_AVAILABLE = True
+except ImportError:
+    MSGPACK_AVAILABLE = False
+    app.logger.warning('msgpack not available. Using JSON compression instead.')
 
 # ============================================================================
 # Flaskアプリケーション初期化
@@ -3102,18 +3109,46 @@ class UnityTrainingSessionResource(Resource):
                 
                 # 新しいログを追加
                 for log_data in data['operation_logs']:
+                    # MessagePack圧縮されたデータをデコード（もしあれば）
+                    equipment_state = log_data.get('equipment_state')
+                    if isinstance(equipment_state, str) and equipment_state.startswith('msgpack:'):
+                        # MessagePack圧縮データをデコード
+                        try:
+                            compressed_data = base64.b64decode(equipment_state[8:])  # 'msgpack:'プレフィックスを除去
+                            if MSGPACK_AVAILABLE:
+                                equipment_state = msgpack.unpackb(compressed_data, raw=False)
+                            else:
+                                equipment_state = json.loads(equipment_state[8:])
+                        except Exception as e:
+                            app.logger.error(f'Failed to decode MessagePack data: {e}')
+                            equipment_state = None
+                    elif isinstance(equipment_state, dict):
+                        equipment_state = equipment_state
+                    else:
+                        equipment_state = None
+                    
+                    # イベントタイプを判定
+                    event_type = 'operation'
+                    if log_data.get('error_event', False):
+                        event_type = 'error'
+                    elif log_data.get('achievement_event', False):
+                        event_type = 'achievement'
+                    
                     log = OperationLog(
                         training_session_id=session_obj.id,
                         timestamp=datetime.fromisoformat(log_data['timestamp'].replace('Z', '+00:00')),
                         operation_type=log_data.get('operation_type'),
                         operation_value=log_data.get('operation_value'),
-                        equipment_state=json.dumps(log_data.get('equipment_state')) if log_data.get('equipment_state') else None,
+                        equipment_state=json.dumps(equipment_state) if equipment_state else None,
                         position_x=log_data.get('position_x'),
                         position_y=log_data.get('position_y'),
                         position_z=log_data.get('position_z'),
                         velocity=log_data.get('velocity'),
                         error_event=log_data.get('error_event', False),
                         error_description=log_data.get('error_description'),
+                        achievement_event=log_data.get('achievement_event', False),
+                        achievement_description=log_data.get('achievement_description'),
+                        event_type=event_type,
                     )
                     session_db.add(log)
             
@@ -3179,13 +3214,36 @@ class ReplaySessionResource(Resource):
             ).order_by(OperationLog.timestamp).all()
             
             for log in operation_logs:
-                operation_logs_list.append({
+                log_entry = {
                     'timestamp': serialize_date(log.timestamp),
                     'operation_type': log.operation_type,
                     'operation_value': log.operation_value,
                     'error_event': log.error_event,
                     'error_description': log.error_description,
-                })
+                    'achievement_event': log.achievement_event if hasattr(log, 'achievement_event') else False,
+                    'achievement_description': log.achievement_description if hasattr(log, 'achievement_description') else None,
+                    'event_type': log.event_type if hasattr(log, 'event_type') else 'operation',
+                }
+                
+                # 状態ログ（重機姿勢、位置、速度）
+                if log.position_x is not None or log.position_y is not None or log.position_z is not None or log.velocity is not None:
+                    log_entry['state_log'] = {
+                        'position': {
+                            'x': log.position_x,
+                            'y': log.position_y,
+                            'z': log.position_z,
+                        },
+                        'velocity': log.velocity,
+                    }
+                
+                # 重機状態（equipment_state）
+                if log.equipment_state:
+                    try:
+                        log_entry['equipment_state'] = json.loads(log.equipment_state)
+                    except:
+                        log_entry['equipment_state'] = log.equipment_state
+                
+                operation_logs_list.append(log_entry)
             
             # リプレイデータを構築
             replay_data = {
@@ -3223,11 +3281,16 @@ class ReplaySessionResource(Resource):
                 ).order_by(OperationLog.timestamp).all()
                 
                 for log in operation_logs:
-                    kpi_timeline.append({
+                    kpi_timeline_entry = {
                         'timestamp': serialize_date(log.timestamp),
                         'error_event': log.error_event,
                         'error_description': log.error_description,
-                    })
+                    }
+                    # 目標達成イベントを追加
+                    if hasattr(log, 'achievement_event') and log.achievement_event:
+                        kpi_timeline_entry['achievement_event'] = True
+                        kpi_timeline_entry['achievement_description'] = log.achievement_description if hasattr(log, 'achievement_description') else None
+                    kpi_timeline.append(kpi_timeline_entry)
                 
                 replay_data['kpi_timeline'] = kpi_timeline
             

@@ -637,6 +637,9 @@ class OperationLog(Base):
     velocity = Column(Float)  # 重機の速度
     error_event = Column(Boolean, default=False)  # エラーイベントが発生したかどうか
     error_description = Column(Text)  # エラー説明
+    achievement_event = Column(Boolean, default=False)  # 目標達成イベントが発生したかどうか
+    achievement_description = Column(Text)  # 目標達成説明
+    event_type = Column(String(50))  # イベントタイプ（error, achievement, operation）
     created_at = Column(DateTime, default=datetime.now)  # 作成日時
     
     # リレーション
@@ -1005,6 +1008,47 @@ class Database:
                     print(f"{table_name}テーブルのphoneカラム拡張エラー: {e}")
                     import traceback
                     traceback.print_exc()
+        
+        # operation_logsテーブルに不足しているカラムを追加
+        if 'operation_logs' in inspector.get_table_names():
+            try:
+                columns = {col['name']: col for col in inspector.get_columns('operation_logs')}
+                db_type = self.engine.dialect.name
+                
+                # 追加が必要なカラムのリスト
+                required_columns = {
+                    'achievement_event': 'BOOLEAN DEFAULT FALSE',
+                    'achievement_description': 'TEXT',
+                    'event_type': 'VARCHAR(50)',
+                }
+                
+                for col_name, col_type in required_columns.items():
+                    if col_name not in columns:
+                        if db_type == 'postgresql':
+                            with self.engine.begin() as conn:
+                                conn.execute(text(f"""
+                                    DO $$ 
+                                    BEGIN 
+                                        IF NOT EXISTS (
+                                            SELECT 1 FROM information_schema.columns 
+                                            WHERE table_name = 'operation_logs' 
+                                            AND column_name = '{col_name}'
+                                        ) THEN
+                                            ALTER TABLE operation_logs ADD COLUMN {col_name} {col_type};
+                                        END IF;
+                                    END $$;
+                                """))
+                        else:
+                            # その他のデータベース（SQLiteなど）
+                            with self.engine.begin() as conn:
+                                conn.execute(text(f"ALTER TABLE operation_logs ADD COLUMN {col_name} {col_type}"))
+                        print(f"operation_logsテーブルに{col_name}カラムを追加しました。")
+                    else:
+                        print(f"operation_logsテーブルに{col_name}カラムは既に存在します。")
+            except Exception as e:
+                print(f"operation_logsテーブルのカラム追加エラー: {e}")
+                import traceback
+                traceback.print_exc()
         
         print("データベースを初期化しました。")
     

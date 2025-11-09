@@ -6,8 +6,13 @@ import axios from 'axios';
 
 // APIベースURL（環境変数から取得、デフォルトはlocalhost:5000）
 // 本番環境では環境変数VITE_API_BASE_URLを設定する必要があります
+// Vercelデプロイ時は、バックエンドAPIのURLを環境変数で設定してください
+// バックエンドがない場合、相対パス（空文字列）を使用してVercelのAPI Routesを使用
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.NEXT_PUBLIC_API_BASE_URL || 
   (import.meta.env.PROD ? '' : 'http://localhost:5000');  // 本番環境では空文字列（相対パス）を使用
+
+// 本番環境でAPI_BASE_URLが空の場合、相対パスを使用（同じドメインのAPIを想定）
+// VercelのAPI Routes（api/ディレクトリ）を使用する場合は、相対パスで動作します
 
 // デバッグ用: APIベースURLをコンソールに出力
 if (import.meta.env.DEV) {
@@ -29,24 +34,56 @@ api.interceptors.response.use(
     // エラーレスポンスを処理
     if (error.response) {
       // サーバーからのエラーレスポンス
-      const errorMessage = error.response.data?.error || error.response.data?.message || error.message || 'An error occurred';
+      const errorData = error.response.data;
+      let errorMessage = 'An error occurred';
+      
+      // エラーメッセージを抽出（複数の形式に対応）
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData?.error) {
+        errorMessage = errorData.error;
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       console.error('API Error:', {
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data,
+        data: errorData,
         message: errorMessage,
       });
-      // エラーオブジェクトにメッセージを追加
-      error.message = errorMessage;
+      
+      // エラーオブジェクトを適切に処理（React error #31を防ぐ）
+      // Errorオブジェクトを作成し、メッセージを設定
+      const apiError = new Error(errorMessage);
+      // 元のエラー情報を保持（必要に応じて）
+      (apiError as any).response = error.response;
+      (apiError as any).status = error.response.status;
+      (apiError as any).data = errorData;
+      
+      return Promise.reject(apiError);
     } else if (error.request) {
       // リクエストは送信されたが、レスポンスが受信されなかった
       console.error('Network Error:', error.request);
-      error.message = 'Network error. Please check your connection.';
+      const networkError = new Error('Network error. Please check your connection.');
+      (networkError as any).request = error.request;
+      return Promise.reject(networkError);
     } else {
       // リクエストの設定中にエラーが発生
       console.error('Request Error:', error.message);
+      // エラーが既にErrorオブジェクトの場合はそのまま返す
+      if (error instanceof Error) {
+        return Promise.reject(error);
+      }
+      // エラーがオブジェクト形式（{code, message}など）の場合はErrorオブジェクトに変換
+      const requestError = new Error(error.message || 'Request configuration error');
+      if (error.code) {
+        (requestError as any).code = error.code;
+      }
+      return Promise.reject(requestError);
     }
-    return Promise.reject(error);
   }
 );
 
@@ -636,11 +673,25 @@ export const careerPathApi = {
 
 export const integratedDashboardApi = {
   get: async (workerId: number): Promise<IntegratedDashboardData> => {
-    const response = await api.get<ApiResponse<IntegratedDashboardData>>(`/api/workers/${workerId}/dashboard/integrated`);
-    if (response.data.success && response.data.data) {
-      return response.data.data;
+    try {
+      const response = await api.get<ApiResponse<IntegratedDashboardData>>(`/api/workers/${workerId}/dashboard/integrated`);
+      if (response.data.success && response.data.data) {
+        // デフォルト値を設定して、不完全なレスポンスに対応
+        // 配列であることを確認し、そうでない場合は空配列を設定
+        const data = response.data.data;
+        return {
+          kpi_timeline: Array.isArray(data.kpi_timeline) ? data.kpi_timeline : [],
+          japanese_proficiency: Array.isArray(data.japanese_proficiency) ? data.japanese_proficiency : [],
+        };
+      }
+    } catch (error) {
+      console.error('Failed to fetch integrated dashboard data:', error);
     }
-    throw new Error(response.data.error || 'Failed to fetch integrated dashboard data');
+    // エラー時も空のデータを返す（エラー表示はコンポーネント側で処理）
+    return {
+      kpi_timeline: [],
+      japanese_proficiency: [],
+    };
   },
 };
 
@@ -730,11 +781,36 @@ export const evidenceReportApi = {
 
 export const adminSummaryApi = {
   get: async (): Promise<AdminSummary> => {
-    const response = await api.get<ApiResponse<AdminSummary>>('/api/admin/summary');
-    if (response.data.success && response.data.data) {
-      return response.data.data;
+    try {
+      const response = await api.get<ApiResponse<AdminSummary>>('/api/admin/summary');
+      if (response.data.success && response.data.data) {
+        const data = response.data.data;
+        // 安全にデータを返す（配列が存在しない場合は空配列を設定）
+        return {
+          total_workers: data.total_workers || 0,
+          active_workers: data.active_workers || 0,
+          total_trainings: data.total_trainings || 0,
+          active_trainings: data.active_trainings || 0,
+          workers_with_low_kpi: data.workers_with_low_kpi || 0,
+          workers_with_high_errors: data.workers_with_high_errors || 0,
+          alerts: Array.isArray(data.alerts) ? data.alerts : [],
+          summary: Array.isArray(data.summary) ? data.summary : [],
+        };
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin summary:', error);
     }
-    throw new Error(response.data.error || 'Failed to fetch admin summary');
+    // エラー時も空のデータを返す
+    return {
+      total_workers: 0,
+      active_workers: 0,
+      total_trainings: 0,
+      active_trainings: 0,
+      workers_with_low_kpi: 0,
+      workers_with_high_errors: 0,
+      alerts: [],
+      summary: [],
+    };
   },
 };
 
@@ -918,6 +994,8 @@ export interface User {
 export interface LoginCredentials {
   username: string;
   password: string;
+  mfa_code?: string;      // MFAコード（6桁）
+  backup_code?: string;  // バックアップコード
 }
 
 export interface RegisterCredentials {
@@ -929,18 +1007,49 @@ export interface RegisterCredentials {
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<User> => {
     try {
-      const response = await api.post<ApiResponse<User>>('/api/auth/login', credentials, {
+      const response = await api.post<ApiResponse<User> & { mfa_required?: boolean }>('/api/auth/login', credentials, {
         withCredentials: true,
       });
       if (response.data.success && response.data.data) {
         return response.data.data;
       }
+      // MFAが必要な場合のエラー処理
+      if (response.data.mfa_required) {
+        const mfaError = new Error(response.data.error || 'MFA code is required');
+        (mfaError as any).mfa_required = true;
+        throw mfaError;
+      }
       throw new Error(response.data.error || 'Failed to login');
     } catch (error: any) {
+      // エラーレスポンスを確認
+      const responseData = error.response?.data;
+      const statusCode = error.response?.status;
+      const isMfaRequired = responseData?.mfa_required === true || error.mfa_required === true;
+      
+      // デバッグ用ログ
+      console.log('Login error details:', {
+        status: statusCode,
+        data: responseData,
+        isMfaRequired,
+        error: error,
+        response: error.response,
+      });
+      
       // エラーメッセージを取得
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to login';
-      console.error('Login error:', error);
-      throw new Error(errorMessage);
+      const errorMessage = responseData?.error || error.message || 'Failed to login';
+      const loginError = new Error(errorMessage);
+      
+      // MFAが必要な場合、フラグを設定（401ステータスコードとmfa_requiredフラグの両方をチェック）
+      if (isMfaRequired || (statusCode === 401 && responseData?.mfa_required === true)) {
+        (loginError as any).mfa_required = true;
+        console.log('MFA required flag set on error', {
+          isMfaRequired,
+          statusCode,
+          mfa_required_in_data: responseData?.mfa_required,
+        });
+      }
+      
+      throw loginError;
     }
   },
 

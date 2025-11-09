@@ -88,12 +88,14 @@ export default function AdminSummary() {
 
         <div className="glass rounded-2xl p-6 shadow-xl card-hover">
           <div className="text-sm text-gray-600 mb-2">{t('totalAlerts')}</div>
-          <div className="text-3xl font-bold text-yellow-600">{summary.alerts.length}</div>
+          <div className="text-3xl font-bold text-yellow-600">
+            {summary.alerts && Array.isArray(summary.alerts) ? summary.alerts.length : 0}
+          </div>
         </div>
       </div>
 
       {/* アラート */}
-      {summary.alerts.length > 0 && (
+      {summary.alerts && Array.isArray(summary.alerts) && summary.alerts.length > 0 && (
         <div className="glass rounded-2xl shadow-xl overflow-hidden card-hover">
           <div className="p-6 bg-gradient-to-r from-red-600 to-pink-600 text-white">
             <h3 className="text-xl font-bold mb-4">{t('alerts')}</h3>
@@ -131,7 +133,7 @@ export default function AdminSummary() {
           <h3 className="text-xl font-bold mb-4">{t('allWorkersProgress')}</h3>
         </div>
         <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-          {summary.summary.length === 0 ? (
+          {(!summary.summary || !Array.isArray(summary.summary) || summary.summary.length === 0) ? (
             <div className="p-12 text-center">
               <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                 <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

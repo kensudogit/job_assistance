@@ -51,21 +51,9 @@ function App() {
     console.log('現在のactiveTabステート:', activeTab);
   }, [activeTab]);
 
-  // コンポーネントマウント時に認証状態をチェック（一時的に無効化）
+  // コンポーネントマウント時に認証状態をチェック
   useEffect(() => {
-    // 認証チェックをスキップして、ダミーユーザーを設定
-    const dummyUser: User = {
-      id: 1,
-      username: 'admin',
-      email: 'admin@example.com',
-      role: 'administrator',
-      worker_id: null,
-    };
-    setUser(dummyUser);
-    setLoading(false);
-    
-    // 元の認証チェック（コメントアウト）
-    // checkAuth();
+    checkAuth();
   }, []);
 
   /**
@@ -121,10 +109,10 @@ function App() {
     );
   }
 
-  // 認証画面を一時的に無効化
-  // if (!user) {
-  //   return <Login onLoginSuccess={handleLoginSuccess} />;
-  // }
+  // 認証されていない場合はログイン画面を表示
+  if (!user) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <main 
@@ -179,6 +167,16 @@ function App() {
                 src="/PC.png" 
                 alt="Logo" 
                 className="w-16 h-16 rounded-xl object-contain shadow-lg"
+                onError={(e) => {
+                  // 画像が読み込めない場合、代替画像を試す
+                  const target = e.currentTarget;
+                  if (target.src !== '/src/PC.png') {
+                    target.src = '/src/PC.png';
+                  } else {
+                    // 画像が表示できない場合、ロゴアイコンを表示
+                    target.style.display = 'none';
+                  }
+                }}
               />
               <h1 
                 className="text-3xl font-bold"
@@ -220,8 +218,7 @@ function App() {
       {/* サイドバーとメインコンテンツのレイアウト */}
       <div className="flex relative mt-[88px]">
         {/* サイドバー */}
-        {/* サイドバーを常に表示（一時的に条件を無効化） */}
-        {true ? (
+        {user ? (
           <aside 
             className="w-72 fixed left-0 overflow-y-auto z-40"
             style={{

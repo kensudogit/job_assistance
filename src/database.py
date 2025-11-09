@@ -27,6 +27,10 @@ class User(Base):
     worker_id = Column(Integer, ForeignKey('workers.id'), nullable=True)  # 訓練生の場合、Workerとの関連
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime)
+    # 多要素認証（MFA）関連フィールド
+    mfa_enabled = Column(Boolean, default=False)  # MFAが有効かどうか
+    mfa_secret = Column(String(32), nullable=True)  # TOTPシークレットキー（Base32エンコード）
+    backup_codes = Column(Text, nullable=True)  # バックアップコード（JSON形式、暗号化推奨）
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
@@ -930,6 +934,10 @@ class Database:
             import psycopg2
             import socket
             
+            # ロガーを先に定義
+            import logging
+            logger = logging.getLogger(__name__)
+            
             # hostnameをIPアドレスに変換して、hostaddrを設定することで、TCP/IP接続を強制
             # 複数回試行して、確実にIPアドレスを取得
             host_ip = None
@@ -981,13 +989,30 @@ class Database:
                     # 注意: hostaddrが設定されていない場合でも、hostとportが指定されていれば
                     # psycopg2はTCP/IP接続を使用するが、Unixソケット接続を試みることがある
                     # そのため、可能な限りhostaddrを設定する
-                    # ここでは、hostとportを明示的に指定することでTCP/IP接続を強制
-                    pass
+                    # サービス名の場合でも、再度解決を試みる
+                    try:
+                        # サービス名をIPアドレスに解決（Dockerコンテナ内で有効）
+                        # 少し待ってから再試行（DNS解決のため）
+                        import time
+                        time.sleep(0.2)
+                        resolved_ip = socket.gethostbyname(parsed_url.hostname)
+                        conn_params['hostaddr'] = resolved_ip
+                        logger.info(f"サービス名 '{parsed_url.hostname}' をIPアドレス '{resolved_ip}' に解決しました")
+                    except (socket.gaierror, OSError) as e:
+                        # 解決できない場合でも、hostaddrを設定する必要がある
+                        # そのため、接続時に解決されるように、hostaddrを設定しない
+                        # しかし、hostとportを明示的に指定することでTCP/IP接続を強制
+                        # ただし、hostaddrが設定されていないため、Unixソケット接続を試みる可能性がある
+                        # そのため、hostaddrを強制的に設定するために、hostnameを再度解決する
+                        logger.warning(f"サービス名 '{parsed_url.hostname}' をIPアドレスに解決できませんでした: {e}")
+                        # hostaddrが設定されていない場合、psycopg2はUnixソケット接続を試みる可能性がある
+                        # そのため、hostaddrを強制的に設定する必要がある
+                        # しかし、解決できない場合、接続時にエラーが発生する可能性がある
+                        # そのため、hostaddrを設定しない（接続時に解決される）
+                        pass
             
             # creator関数を定義（変数として明示的に保持）
             # デバッグ用: 接続パラメータをログ出力
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"PostgreSQL接続パラメータ: host={conn_params.get('host')}, hostaddr={conn_params.get('hostaddr')}, port={conn_params.get('port')}")
             
             def _creator():
@@ -995,16 +1020,36 @@ class Database:
                 # デフォルトでTCP/IP接続を使用するが、Unixソケット接続を試みることがある
                 # hostaddrを設定することで、確実にTCP/IP接続を強制
                 # さらに、hostを明示的に指定することで、Unixソケット接続を完全に回避
+                # 接続パラメータのコピーを作成（元のパラメータを変更しない）
+                final_params = conn_params.copy()
+                
+                # hostaddrが設定されていない場合、接続時に解決する
+                if 'hostaddr' not in final_params or final_params['hostaddr'] is None:
+                    try:
+                        # サービス名をIPアドレスに解決（Dockerコンテナ内で有効）
+                        resolved_ip = socket.gethostbyname(final_params['host'])
+                        final_params['hostaddr'] = resolved_ip
+                        logger.info(f"接続時にサービス名 '{final_params['host']}' をIPアドレス '{resolved_ip}' に解決しました")
+                    except (socket.gaierror, OSError) as e:
+                        logger.warning(f"接続時にサービス名 '{final_params['host']}' をIPアドレスに解決できませんでした: {e}")
+                        # 解決できない場合でも、hostとportを明示的に指定することでTCP/IP接続を強制
+                        # ただし、hostaddrが設定されていないため、Unixソケット接続を試みる可能性がある
+                        pass
+                
                 try:
-                    return psycopg2.connect(**conn_params)
+                    return psycopg2.connect(**final_params)
                 except Exception as e:
-                    logger.error(f"PostgreSQL接続エラー: {e}, パラメータ: {conn_params}")
+                    logger.error(f"PostgreSQL接続エラー: {e}, パラメータ: {final_params}")
                     raise
             creator_func = _creator
             
             # connect_argsではなく、creatorを使用
             connect_args = None
-            db_url = "postgresql+psycopg2://"
+            # creator関数を使用する場合でも、有効なURLを提供する必要がある
+            # ただし、実際の接続はcreator関数で行われるため、URLは使用されない
+            # しかし、SQLAlchemyがURLを解析しようとすると、hostnameがNoneだと問題が発生する可能性がある
+            # そのため、元のURLを保持する
+            # db_urlは変更しない（元のURLを保持）
         
         # SQLAlchemyエンジンを作成（echo=FalseでSQLログを無効化）
         # creator関数が定義されている場合、それを使用。そうでない場合、connect_argsを使用
@@ -1176,6 +1221,47 @@ class Database:
                         print(f"operation_logsテーブルに{col_name}カラムは既に存在します。")
             except Exception as e:
                 print(f"operation_logsテーブルのカラム追加エラー: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # usersテーブルにMFA関連のカラムを追加
+        if 'users' in inspector.get_table_names():
+            try:
+                columns = {col['name']: col for col in inspector.get_columns('users')}
+                db_type = self.engine.dialect.name
+                
+                # 追加が必要なカラムのリスト
+                required_columns = {
+                    'mfa_enabled': 'BOOLEAN DEFAULT FALSE',
+                    'mfa_secret': 'VARCHAR(32)',
+                    'backup_codes': 'TEXT',
+                }
+                
+                for col_name, col_type in required_columns.items():
+                    if col_name not in columns:
+                        if db_type == 'postgresql':
+                            with self.engine.begin() as conn:
+                                conn.execute(text(f"""
+                                    DO $$ 
+                                    BEGIN 
+                                        IF NOT EXISTS (
+                                            SELECT 1 FROM information_schema.columns 
+                                            WHERE table_name = 'users' 
+                                            AND column_name = '{col_name}'
+                                        ) THEN
+                                            ALTER TABLE users ADD COLUMN {col_name} {col_type};
+                                        END IF;
+                                    END $$;
+                                """))
+                        else:
+                            # その他のデータベース（SQLiteなど）
+                            with self.engine.begin() as conn:
+                                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+                        print(f"usersテーブルに{col_name}カラムを追加しました。")
+                    else:
+                        print(f"usersテーブルに{col_name}カラムは既に存在します。")
+            except Exception as e:
+                print(f"usersテーブルのMFAカラム追加エラー: {e}")
                 import traceback
                 traceback.print_exc()
         

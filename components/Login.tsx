@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authApi, type LoginCredentials, type RegisterCredentials } from '@/lib/api';
 
@@ -35,6 +35,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   });
   const [error, setError] = useState<string | null>(null);      // エラーメッセージ
   const [loading, setLoading] = useState(false);                // ローディング状態
+  const [mfaRequired, setMfaRequired] = useState(false);         // MFAが必要かどうか
+  const [mfaCode, setMfaCode] = useState('');                  // MFAコード
+  const [backupCode, setBackupCode] = useState('');            // バックアップコード
+  const [useBackupCode, setUseBackupCode] = useState(false);   // バックアップコードを使用するかどうか
+  
+  // デバッグ用: mfaRequiredの変更を監視
+  useEffect(() => {
+    console.log('mfaRequired state changed:', mfaRequired, 'isRegisterMode:', isRegisterMode);
+  }, [mfaRequired, isRegisterMode]);
 
   /**
    * フォーム送信ハンドラ
@@ -44,6 +53,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    
+    // デバッグ用ログ
+    console.log('Login form submitted:', {
+      isRegisterMode,
+      mfaRequired,
+      mfaCode,
+      backupCode,
+      username: isRegisterMode ? registerData.username : credentials.username,
+    });
 
     try {
       if (isRegisterMode) {
@@ -57,23 +75,58 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         // ログイン成功時にコールバックを実行
         onLoginSuccess(user);
       } else {
-        // ログインAPIを呼び出し
-        const user = await authApi.login(credentials);
+        // ログインAPIを呼び出し（MFAコードを含む）
+        const loginCredentials: LoginCredentials = {
+          ...credentials,
+          ...(mfaCode ? { mfa_code: mfaCode } : {}),
+          ...(backupCode ? { backup_code: backupCode } : {}),
+        };
+        const user = await authApi.login(loginCredentials);
         // ログイン成功時にコールバックを実行
         onLoginSuccess(user);
+        // MFA状態をリセット
+        setMfaRequired(false);
+        setMfaCode('');
+        setBackupCode('');
+        setUseBackupCode(false);
       }
-    } catch (err) {
-      // エラーを設定（詳細なエラーメッセージを表示）
-      let errorMessage = '';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null && 'message' in err) {
-        errorMessage = String(err.message);
+    } catch (err: any) {
+      // デバッグ用ログ
+      console.log('Login error caught:', {
+        err,
+        mfa_required: err?.mfa_required,
+        error_type: err instanceof Error,
+        error_message: err?.message,
+      });
+      
+      // MFAが必要な場合
+      const isMfaRequired = err?.mfa_required === true || 
+                          (err instanceof Error && (err as any).mfa_required === true);
+      
+      if (isMfaRequired) {
+        console.log('MFA required - showing MFA input');
+        setMfaRequired(true);
+        setError(null);
+        // パスワードフィールドを無効化（MFA入力中）
+        // credentialsは既に入力されているので、そのまま保持
       } else {
-        errorMessage = isRegisterMode ? 'Registration failed' : 'Login failed';
+        // エラーを設定（詳細なエラーメッセージを表示）
+        let errorMessage = '';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === 'object' && err !== null && 'message' in err) {
+          errorMessage = String(err.message);
+        } else {
+          errorMessage = isRegisterMode ? 'Registration failed' : 'Login failed';
+        }
+        console.error('Auth error:', err);
+        setError(errorMessage);
+        // MFA状態をリセット（エラーの場合）
+        setMfaRequired(false);
+        setMfaCode('');
+        setBackupCode('');
+        setUseBackupCode(false);
       }
-      console.error('Auth error:', err);
-      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -274,19 +327,103 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               required
               autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
               minLength={isRegisterMode ? 8 : undefined}
+              disabled={mfaRequired}
             />
           </div>
 
+          {/* MFAコード入力（MFAが必要な場合） */}
+          {mfaRequired && !isRegisterMode && (
+            <div 
+              className="space-y-4 p-4 rounded-lg border"
+              key="mfa-input"
+              style={{
+                background: 'rgba(59, 130, 246, 0.05)',
+                borderColor: 'rgba(59, 130, 246, 0.2)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+              }}
+            >
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-700 mb-2">
+                  多要素認証（MFA）コードを入力してください
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setUseBackupCode(!useBackupCode)}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                >
+                  {useBackupCode ? 'MFAコードを使用' : 'バックアップコードを使用'}
+                </button>
+              </div>
+              
+              {!useBackupCode ? (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    MFAコード（6桁）
+                  </label>
+                  <input
+                    type="text"
+                    value={mfaCode}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setMfaCode(value);
+                    }}
+                    className="w-full px-4 py-3 rounded-lg transition-all duration-300 text-center text-2xl font-mono tracking-widest"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)',
+                    }}
+                    placeholder="000000"
+                    maxLength={6}
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-600 mt-2 text-center">
+                    認証アプリ（Google Authenticator等）に表示される6桁のコードを入力してください
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    バックアップコード
+                  </label>
+                  <input
+                    type="text"
+                    value={backupCode}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+                      setBackupCode(value);
+                    }}
+                    className="w-full px-4 py-3 rounded-lg transition-all duration-300 text-center text-lg font-mono tracking-wider"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)',
+                    }}
+                    placeholder="ABCD1234"
+                    maxLength={8}
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-600 mt-2 text-center">
+                    MFA設定時に保存したバックアップコードを入力してください
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (mfaRequired && !mfaCode && !backupCode)}
             className="w-full px-6 py-3 text-white font-semibold rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
               boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.4)',
             }}
             onMouseEnter={(e) => {
-              if (!loading) {
+              if (!loading && !(mfaRequired && !mfaCode && !backupCode)) {
                 e.currentTarget.style.transform = 'scale(1.05)';
                 e.currentTarget.style.boxShadow = '0 15px 35px -5px rgba(37, 99, 235, 0.5)';
               }
@@ -296,12 +433,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(37, 99, 235, 0.4)';
             }}
             onMouseDown={(e) => {
-              if (!loading) {
+              if (!loading && !(mfaRequired && !mfaCode && !backupCode)) {
                 e.currentTarget.style.transform = 'scale(0.95)';
               }
             }}
             onMouseUp={(e) => {
-              if (!loading) {
+              if (!loading && !(mfaRequired && !mfaCode && !backupCode)) {
                 e.currentTarget.style.transform = 'scale(1.05)';
               }
             }}
@@ -309,10 +446,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                {isRegisterMode ? '登録中...' : 'ログイン中...'}
+                {mfaRequired ? '認証中...' : isRegisterMode ? '登録中...' : 'ログイン中...'}
               </span>
             ) : (
-              isRegisterMode ? '新規登録' : 'ログイン'
+              mfaRequired ? 'MFAコードでログイン' : isRegisterMode ? '新規登録' : 'ログイン'
             )}
           </button>
         </form>

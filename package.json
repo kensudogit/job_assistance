@@ -36,6 +36,7 @@
     "@tailwindcss/postcss": "^4.1.16",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
+    "@vercel/node": "^5.5.5",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.21",
     "jsdom": "^27.1.0",

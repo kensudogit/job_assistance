@@ -17,7 +17,11 @@ import os
 import base64
 import hashlib
 import secrets
+import logging
 from datetime import datetime, timedelta
+
+# ロガーの設定
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # XSS対策（入力サニタイゼーション）
@@ -411,4 +415,150 @@ def validate_password_strength(password):
         return False, "Password must contain at least 2 of the following: uppercase letters, lowercase letters, numbers, special characters"
     
     return True, "Password strength is sufficient"
+
+
+# ============================================================================
+# 多要素認証（MFA/TOTP）
+# ============================================================================
+
+def generate_mfa_secret():
+    """
+    MFA用のシークレットキーを生成（Base32エンコード）
+    
+    Returns:
+        str: Base32エンコードされたシークレットキー
+    """
+    import pyotp
+    return pyotp.random_base32()
+
+
+def generate_mfa_qr_code(secret, username, issuer_name="外国人就労支援システム"):
+    """
+    MFA用のQRコードを生成（Google Authenticator等で読み取れる形式）
+    
+    Args:
+        secret: Base32エンコードされたシークレットキー
+        username: ユーザー名
+        issuer_name: 発行者名（アプリ名）
+    
+    Returns:
+        str: QRコードのBase64エンコードされた画像データ（data URI形式）
+    """
+    import pyotp
+    import qrcode
+    import io
+    import base64
+    
+    # TOTP URIを生成
+    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=username,
+        issuer_name=issuer_name
+    )
+    
+    # QRコードを生成
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(totp_uri)
+    qr.make(fit=True)
+    
+    # 画像を生成
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Base64エンコード
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+    
+    return f"data:image/png;base64,{img_str}"
+
+
+def verify_mfa_code(secret, code):
+    """
+    MFAコードを検証（TOTP）
+    
+    Args:
+        secret: Base32エンコードされたシークレットキー
+        code: ユーザーが入力した6桁のコード
+    
+    Returns:
+        bool: コードが有効かどうか
+    """
+    import pyotp
+    
+    if not secret or not code:
+        return False
+    
+    # 開発環境用の万能MFAコード（本番環境では無効）
+    # 環境変数FLASK_ENVが'production'でない場合のみ有効
+    if os.getenv('FLASK_ENV', 'development') != 'production':
+        # 万能MFAコード: "000000" または "123456" または "999999"
+        universal_codes = ['000000', '123456', '999999']
+        if str(code).strip() in universal_codes:
+            logger.warning(f'Universal MFA code used: {code} (development mode only)')
+            return True
+    
+    try:
+        # コードを整数に変換
+        code_int = int(code)
+        
+        # TOTPオブジェクトを作成
+        totp = pyotp.TOTP(secret)
+        
+        # 現在のコードと前後の時間窓（±1）を許容して検証
+        return totp.verify(code_int, valid_window=1)
+    except (ValueError, TypeError):
+        return False
+
+
+def generate_backup_codes(count=10):
+    """
+    バックアップコードを生成（MFAデバイスが利用できない場合の代替手段）
+    
+    Args:
+        count: 生成するコードの数（デフォルト: 10）
+    
+    Returns:
+        list: バックアップコードのリスト
+    """
+    codes = []
+    for _ in range(count):
+        # 8桁のランダムな数字コードを生成
+        code = secrets.token_hex(4).upper()  # 8文字の16進数文字列
+        codes.append(code)
+    return codes
+
+
+def verify_backup_code(backup_codes_json, code):
+    """
+    バックアップコードを検証
+    
+    Args:
+        backup_codes_json: JSON形式のバックアップコードリスト（暗号化されている可能性あり）
+        code: ユーザーが入力したバックアップコード
+    
+    Returns:
+        tuple: (is_valid: bool, remaining_codes: list) - コードが有効かどうかと残りのコードリスト
+    """
+    import json
+    
+    if not backup_codes_json or not code:
+        return False, []
+    
+    try:
+        # JSONをパース（暗号化されている場合は復号化が必要）
+        # ここでは暗号化されていない前提で実装（必要に応じて復号化処理を追加）
+        codes = json.loads(backup_codes_json)
+        
+        if not isinstance(codes, list):
+            return False, []
+        
+        # コードを検証（大文字小文字を区別しない）
+        code_upper = code.upper().strip()
+        if code_upper in codes:
+            # 使用されたコードを削除
+            codes.remove(code_upper)
+            return True, codes
+        else:
+            return False, codes
+    except (json.JSONDecodeError, ValueError, AttributeError):
+        return False, []
 

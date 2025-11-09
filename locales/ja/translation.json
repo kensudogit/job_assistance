@@ -195,6 +195,13 @@
   "completedAt": "完了日時",
   "notStarted": "未開始",
   "interrupted": "中断",
-  "noSessionsFound": "セッションが見つかりません"
+  "noSessionsFound": "セッションが見つかりません",
+  "confirmDeleteProficiency": "この日本語能力記録を削除しますか？",
+  "noProficiencyRecordsFound": "日本語能力記録が見つかりません",
+  "points": "点",
+  "select": "選択...",
+  "failedToLoadProficiencies": "日本語能力記録の読み込みに失敗しました",
+  "failedToSaveProficiency": "日本語能力記録の保存に失敗しました",
+  "failedToDeleteProficiency": "日本語能力記録の削除に失敗しました"
 }
 

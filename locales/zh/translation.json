@@ -179,6 +179,13 @@
   "completedAt": "完成时间",
   "notStarted": "未开始",
   "interrupted": "已中断",
-  "noSessionsFound": "未找到会话"
+  "noSessionsFound": "未找到会话",
+  "confirmDeleteProficiency": "删除此日语能力记录？",
+  "noProficiencyRecordsFound": "未找到日语能力记录",
+  "points": "分",
+  "select": "选择...",
+  "failedToLoadProficiencies": "加载日语能力记录失败",
+  "failedToSaveProficiency": "保存日语能力记录失败",
+  "failedToDeleteProficiency": "删除日语能力记录失败"
 }
 

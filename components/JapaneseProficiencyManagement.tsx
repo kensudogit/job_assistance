@@ -27,7 +27,7 @@ export default function JapaneseProficiencyManagement({ workerId }: JapaneseProf
       const data = await japaneseProficiencyApi.getAll(workerId);
       setProficiencies(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load proficiencies');
+      setError(err instanceof Error ? err.message : t('failedToLoadProficiencies'));
     } finally {
       setLoading(false);
     }
@@ -59,25 +59,25 @@ export default function JapaneseProficiencyManagement({ workerId }: JapaneseProf
       setEditingProficiency(null);
       loadProficiencies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save proficiency');
+      setError(err instanceof Error ? err.message : t('failedToSaveProficiency'));
     }
   };
 
   const handleDeleteProficiency = async (proficiencyId: number) => {
-    if (!confirm('Delete this proficiency record?')) return;
+    if (!confirm(t('confirmDeleteProficiency'))) return;
     
     try {
       await japaneseProficiencyApi.delete(workerId, proficiencyId);
       loadProficiencies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete proficiency');
+      setError(err instanceof Error ? err.message : t('failedToDeleteProficiency'));
     }
   };
 
   if (loading) {
     return (
       <div className="glass rounded-2xl p-6">
-        <div className="text-center text-gray-500">Loading...</div>
+        <div className="text-center text-gray-500">{t('loading')}</div>
       </div>
     );
   }
@@ -135,7 +135,7 @@ export default function JapaneseProficiencyManagement({ workerId }: JapaneseProf
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <p className="text-gray-500 font-medium">No proficiency records found</p>
+            <p className="text-gray-500 font-medium">{t('noProficiencyRecordsFound')}</p>
           </div>
         ) : (
           proficiencies.map((proficiency, index) => (
@@ -162,7 +162,7 @@ export default function JapaneseProficiencyManagement({ workerId }: JapaneseProf
                   </div>
                   {proficiency.total_score && (
                     <div className="text-lg font-bold text-gray-900 mb-2">
-                      {t('totalScore')}: {proficiency.total_score}点
+                      {t('totalScore')}: {proficiency.total_score}{t('points')}
                     </div>
                   )}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
@@ -280,7 +280,7 @@ function ProficiencyForm({ proficiency, onSave, onCancel }: ProficiencyFormProps
             onChange={(e) => handleChange('level', e.target.value)}
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
           >
-            <option value="">Select...</option>
+            <option value="">{t('select')}</option>
             <option value="N1">N1</option>
             <option value="N2">N2</option>
             <option value="N3">N3</option>

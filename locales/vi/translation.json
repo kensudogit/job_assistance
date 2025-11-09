@@ -179,6 +179,13 @@
   "completedAt": "Thời gian hoàn thành",
   "notStarted": "Chưa bắt đầu",
   "interrupted": "Bị gián đoạn",
-  "noSessionsFound": "Không tìm thấy phiên"
+  "noSessionsFound": "Không tìm thấy phiên",
+  "confirmDeleteProficiency": "Xóa bản ghi năng lực tiếng Nhật này?",
+  "noProficiencyRecordsFound": "Không tìm thấy bản ghi năng lực tiếng Nhật",
+  "points": " điểm",
+  "select": "Chọn...",
+  "failedToLoadProficiencies": "Không thể tải bản ghi năng lực tiếng Nhật",
+  "failedToSaveProficiency": "Không thể lưu bản ghi năng lực tiếng Nhật",
+  "failedToDeleteProficiency": "Không thể xóa bản ghi năng lực tiếng Nhật"
 }
 

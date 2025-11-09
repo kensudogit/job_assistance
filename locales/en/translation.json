@@ -195,6 +195,13 @@
   "completedAt": "Completed At",
   "notStarted": "Not Started",
   "interrupted": "Interrupted",
-  "noSessionsFound": "No sessions found"
+  "noSessionsFound": "No sessions found",
+  "confirmDeleteProficiency": "Delete this proficiency record?",
+  "noProficiencyRecordsFound": "No proficiency records found",
+  "points": " points",
+  "select": "Select...",
+  "failedToLoadProficiencies": "Failed to load proficiencies",
+  "failedToSaveProficiency": "Failed to save proficiency",
+  "failedToDeleteProficiency": "Failed to delete proficiency"
 }
 

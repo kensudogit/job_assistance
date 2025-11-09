@@ -1007,24 +1007,88 @@ export interface RegisterCredentials {
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<User> => {
     try {
+      // モック実装: localStorageにユーザー情報がある場合、それを検証
+      // 注意: これはモック実装であり、本番環境では使用しないでください
+      // VercelのServerless Functionsでは、register.tsとlogin.tsが別々の関数として実行されるため、
+      // グローバル変数が共有されません。そのため、localStorageに保存されたユーザー情報を使用します。
+      // ただし、MFAが有効なユーザーの場合は、常にAPIを呼び出してMFAチェックを行う必要があります。
+      let shouldSkipLocalStorage = false;
+      if (typeof window !== 'undefined') {
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          try {
+            const user = JSON.parse(savedUser);
+            // ユーザー名が一致し、パスワードが一致する場合
+            if (user.username === credentials.username && user.password === credentials.password) {
+              // 全ユーザーに対してMFAチェックを行う
+              // 注意: 本番環境では、ユーザーの設定に応じてMFAを有効/無効にする必要があります
+              if (!credentials.mfa_code && !credentials.backup_code) {
+                // MFAコードが提供されていない場合、MFAエラーを投げる
+                // これにより、MFA画面が表示される
+                console.log('MFA code required for all users, throwing MFA error');
+                const mfaError = new Error('MFA code or backup code is required');
+                (mfaError as any).mfa_required = true;
+                throw mfaError;
+              }
+              // MFAコードが提供されている場合は、APIを呼び出してMFAチェックを行う
+              console.log('MFA code provided, calling API for MFA check');
+              // この処理は下のAPI呼び出しに続く
+              shouldSkipLocalStorage = false; // APIを呼び出す
+            }
+          } catch (err) {
+            // MFAエラーの場合は、そのまま再スロー
+            if ((err as any)?.mfa_required === true) {
+              throw err;
+            }
+            console.error('Failed to parse saved user:', err);
+            localStorage.removeItem('user');
+          }
+        }
+      }
+      
+      // APIを呼び出してMFAチェックを行う
+      console.log('Calling API for login/MFA check:', {
+        username: credentials.username,
+        hasMfaCode: !!credentials.mfa_code,
+        hasBackupCode: !!credentials.backup_code,
+      });
+      
       const response = await api.post<ApiResponse<User> & { mfa_required?: boolean }>('/api/auth/login', credentials, {
         withCredentials: true,
       });
-      if (response.data.success && response.data.data) {
-        return response.data.data;
-      }
-      // MFAが必要な場合のエラー処理
-      if (response.data.mfa_required) {
+      
+      console.log('API response received:', {
+        success: response.data.success,
+        mfa_required: response.data.mfa_required,
+        hasData: !!response.data.data,
+        error: response.data.error,
+        fullResponse: response.data,
+      });
+      
+      // MFAが必要な場合のエラー処理（successがfalseでもチェック）
+      if (response.data.mfa_required === true) {
+        console.log('MFA required detected in response.data');
         const mfaError = new Error(response.data.error || 'MFA code is required');
         (mfaError as any).mfa_required = true;
         throw mfaError;
       }
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      
       throw new Error(response.data.error || 'Failed to login');
     } catch (error: any) {
       // エラーレスポンスを確認
       const responseData = error.response?.data;
       const statusCode = error.response?.status;
-      const isMfaRequired = responseData?.mfa_required === true || error.mfa_required === true;
+      
+      // MFAが必要かどうかを確認（複数の方法でチェック）
+      const isMfaRequired = 
+        responseData?.mfa_required === true || 
+        error.mfa_required === true ||
+        (statusCode === 401 && responseData?.mfa_required === true) ||
+        (error instanceof Error && (error as any).mfa_required === true);
       
       // デバッグ用ログ
       console.log('Login error details:', {
@@ -1033,19 +1097,22 @@ export const authApi = {
         isMfaRequired,
         error: error,
         response: error.response,
+        mfa_required_in_error: error.mfa_required,
+        mfa_required_in_response: responseData?.mfa_required,
       });
       
       // エラーメッセージを取得
       const errorMessage = responseData?.error || error.message || 'Failed to login';
       const loginError = new Error(errorMessage);
       
-      // MFAが必要な場合、フラグを設定（401ステータスコードとmfa_requiredフラグの両方をチェック）
-      if (isMfaRequired || (statusCode === 401 && responseData?.mfa_required === true)) {
+      // MFAが必要な場合、フラグを設定
+      if (isMfaRequired) {
         (loginError as any).mfa_required = true;
         console.log('MFA required flag set on error', {
           isMfaRequired,
           statusCode,
           mfa_required_in_data: responseData?.mfa_required,
+          mfa_required_in_error: error.mfa_required,
         });
       }
       
@@ -1063,10 +1130,29 @@ export const authApi = {
       }
       throw new Error(response.data.error || 'Failed to register');
     } catch (error: any) {
-      // エラーメッセージを取得
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to register';
+      // エラーメッセージを取得（複数の形式に対応）
+      let errorMessage = 'Failed to register';
+      
+      if (error instanceof Error) {
+        // Errorオブジェクトの場合
+        errorMessage = error.message;
+      } else if (error.response?.data) {
+        // レスポンスデータがある場合
+        const errorData = error.response.data;
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       console.error('Register error:', error);
-      throw new Error(errorMessage);
+      const registerError = new Error(errorMessage);
+      throw registerError;
     }
   },
 

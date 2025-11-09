@@ -57,11 +57,30 @@ function App() {
   }, []);
 
   /**
-   * 認証状態をチェック（一時的に無効化）
-   * 現在のユーザー情報を取得し、訓練生の場合は自分のworker_idを自動設定
+   * 認証状態をチェック
+   * localStorageからユーザー情報を読み込み、APIで認証状態を確認
    */
   const checkAuth = async () => {
     try {
+      // まずlocalStorageからユーザー情報を読み込む（モック実装用）
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          setUser(user);
+          // 訓練生の場合は自分のworker_idを自動選択
+          if (user.role === 'trainee' && user.worker_id) {
+            setSelectedWorker(user.worker_id);
+          }
+          setLoading(false);
+          return;
+        } catch (err) {
+          console.error('Failed to parse saved user:', err);
+          localStorage.removeItem('user');
+        }
+      }
+      
+      // localStorageにユーザー情報がない場合、APIで認証状態を確認
       const currentUser = await authApi.getCurrentUser();
       setUser(currentUser);
       // 訓練生の場合は自分のworker_idを自動選択
@@ -78,10 +97,47 @@ function App() {
 
   /**
    * ログイン成功時のハンドラ
-   * ユーザー情報を設定し、訓練生の場合はworker_idを自動選択
+   * ユーザー情報を設定し、localStorageに保存、訓練生の場合はworker_idを自動選択
    */
-  const handleLoginSuccess = (loggedInUser: User) => {
+  const handleLoginSuccess = (loggedInUser: User & { password?: string }) => {
     setUser(loggedInUser);
+    // ユーザー情報をlocalStorageに保存（モック実装用）
+    // 注意: パスワードが含まれている場合は、それを保持する
+    try {
+      let userToSave = loggedInUser;
+      
+      // loggedInUserにパスワードが含まれていない場合、既存のlocalStorageから取得を試みる
+      if (!(loggedInUser as any).password) {
+        const existingUser = localStorage.getItem('user');
+        if (existingUser) {
+          try {
+            const existingUserData = JSON.parse(existingUser);
+            // 既存のユーザー情報にパスワードが含まれている場合は、それを保持
+            if (existingUserData.password && existingUserData.username === loggedInUser.username) {
+              userToSave = {
+                ...loggedInUser,
+                password: existingUserData.password,
+              } as User & { password: string };
+              console.log('User saved to localStorage with password from existing data');
+            }
+          } catch (err) {
+            console.error('Failed to parse existing user:', err);
+          }
+        }
+      } else {
+        // loggedInUserにパスワードが含まれている場合は、それを優先
+        console.log('User saved to localStorage with password from loggedInUser');
+      }
+      
+      // パスワードを含むユーザー情報をlocalStorageに保存
+      localStorage.setItem('user', JSON.stringify(userToSave));
+      console.log('User saved to localStorage:', {
+        username: userToSave.username,
+        hasPassword: !!(userToSave as any).password,
+      });
+    } catch (err) {
+      console.error('Failed to save user to localStorage:', err);
+    }
     if (loggedInUser.role === 'trainee' && loggedInUser.worker_id) {
       setSelectedWorker(loggedInUser.worker_id);
     }
@@ -90,14 +146,24 @@ function App() {
   /**
    * ログアウト処理
    * セッションをクリアし、ログイン画面に戻る
+   * 注意: モック実装として、localStorageからユーザー情報を削除しない
+   * これにより、VercelのServerless Functionsの制約により、登録したユーザーがlogin.tsで認識されない問題を回避
+   * 本番環境では、セキュリティ上の理由から、ログアウト時にlocalStorageからユーザー情報を削除する必要があります
    */
   const handleLogout = async () => {
     try {
       await authApi.logout();
+      // モック実装: localStorageからユーザー情報を削除しない
+      // これにより、ログアウト後も再度ログインできるようになる
+      // 本番環境では、セキュリティ上の理由から、localStorageからユーザー情報を削除する必要があります
+      console.log('Logout: Keeping user data in localStorage for mock implementation');
       setUser(null);
       setSelectedWorker(null);
     } catch (err) {
       console.error('Logout error:', err);
+      // エラーが発生しても、localStorageからユーザー情報を削除しない（モック実装）
+      setUser(null);
+      setSelectedWorker(null);
     }
   };
 

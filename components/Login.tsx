@@ -66,14 +66,67 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     try {
       if (isRegisterMode) {
         // 新規登録APIを呼び出し
-        const user = await authApi.register(registerData);
-        // 登録成功後、自動的にログイン
-        await authApi.login({
+        console.log('Starting registration with data:', {
           username: registerData.username,
-          password: registerData.password,
+          email: registerData.email,
+          passwordLength: registerData.password?.length,
         });
-        // ログイン成功時にコールバックを実行
-        onLoginSuccess(user);
+        
+        const user = await authApi.register(registerData);
+        
+        // 登録成功時、直接ログイン成功として扱う
+        // 注意: VercelのServerless Functionsでは、register.tsとlogin.tsが別々の関数として実行されるため、
+        // グローバル変数が共有されない可能性があります。そのため、登録成功時に直接ログイン成功として扱います。
+        console.log('Registration successful, logging in user:', user);
+        
+        // パスワードを含むユーザー情報を作成
+        const userWithPassword = {
+          ...user,
+          password: registerData.password, // モック実装のため、パスワードも保存
+        };
+        
+        // ユーザー情報をlocalStorageに保存（確実に保存するため、ここでも保存）
+        // モック実装として、パスワードも保存する（本番環境では使用しないでください）
+        try {
+          const userJson = JSON.stringify(userWithPassword);
+          console.log('Attempting to save user to localStorage:', {
+            user: userWithPassword,
+            userJson,
+            localStorageAvailable: typeof localStorage !== 'undefined',
+          });
+          
+          localStorage.setItem('user', userJson);
+          
+          // 保存後に確認
+          const savedUser = localStorage.getItem('user');
+          console.log('User saved to localStorage successfully');
+          console.log('localStorage user key exists:', savedUser !== null);
+          console.log('Saved user data:', savedUser);
+          
+          if (!savedUser) {
+            console.error('Warning: User was not saved to localStorage even though setItem was called');
+          } else {
+            // 保存されたデータをパースして確認
+            try {
+              const parsedUser = JSON.parse(savedUser);
+              console.log('Parsed saved user:', parsedUser);
+              console.log('Password in saved user:', parsedUser.password ? 'YES' : 'NO');
+            } catch (parseErr) {
+              console.error('Failed to parse saved user:', parseErr);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to save user to localStorage:', err);
+          console.error('Error details:', {
+            name: err?.name,
+            message: err?.message,
+            stack: err?.stack,
+          });
+        }
+        
+        // 登録成功したユーザー情報でログイン成功として扱う
+        // パスワードを含むユーザー情報を渡す（handleLoginSuccessでパスワードが保持される）
+        onLoginSuccess(userWithPassword);
       } else {
         // ログインAPIを呼び出し（MFAコードを含む）
         const loginCredentials: LoginCredentials = {
@@ -82,8 +135,67 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           ...(backupCode ? { backup_code: backupCode } : {}),
         };
         const user = await authApi.login(loginCredentials);
-        // ログイン成功時にコールバックを実行
-        onLoginSuccess(user);
+        
+        // ログイン成功時、localStorageからパスワードを含むユーザー情報を取得
+        // これにより、パスワードが保持される
+        let userWithPassword = user;
+        try {
+          const existingUserData = localStorage.getItem('user');
+          if (existingUserData) {
+            try {
+              const parsedExistingUser = JSON.parse(existingUserData);
+              // ユーザー名が一致し、パスワードが含まれている場合は、パスワードを含むユーザー情報を使用
+              if (parsedExistingUser.username === user.username && parsedExistingUser.password) {
+                userWithPassword = {
+                  ...user,
+                  password: parsedExistingUser.password,
+                };
+                console.log('Using user data with password from localStorage');
+              }
+            } catch (err) {
+              console.error('Failed to parse existing user:', err);
+            }
+          }
+          
+          // パスワードを含むユーザー情報をlocalStorageに保存
+          const userJson = JSON.stringify(userWithPassword);
+          console.log('Attempting to save user to localStorage after login:', {
+            user: userWithPassword,
+            userJson,
+            localStorageAvailable: typeof localStorage !== 'undefined',
+            hasPassword: !!userWithPassword.password,
+          });
+          
+          localStorage.setItem('user', userJson);
+          
+          // 保存後に確認
+          const savedUserAfterLogin = localStorage.getItem('user');
+          console.log('User saved to localStorage successfully after login');
+          console.log('localStorage user key exists:', savedUserAfterLogin !== null);
+          console.log('Saved user data:', savedUserAfterLogin);
+          
+          if (!savedUserAfterLogin) {
+            console.error('Warning: User was not saved to localStorage even though setItem was called');
+          } else {
+            // 保存されたデータをパースして確認
+            try {
+              const parsedUser = JSON.parse(savedUserAfterLogin);
+              console.log('Parsed saved user after login:', parsedUser);
+              console.log('Password in saved user:', parsedUser.password ? 'YES' : 'NO');
+            } catch (parseErr) {
+              console.error('Failed to parse saved user:', parseErr);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to save user to localStorage:', err);
+          console.error('Error details:', {
+            name: err?.name,
+            message: err?.message,
+            stack: err?.stack,
+          });
+        }
+        // ログイン成功時にコールバックを実行（パスワードを含むユーザー情報を渡す）
+        onLoginSuccess(userWithPassword);
         // MFA状態をリセット
         setMfaRequired(false);
         setMfaCode('');
@@ -99,9 +211,20 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         error_message: err?.message,
       });
       
-      // MFAが必要な場合
-      const isMfaRequired = err?.mfa_required === true || 
-                          (err instanceof Error && (err as any).mfa_required === true);
+      // MFAが必要な場合（複数の方法でチェック）
+      const isMfaRequired = 
+        err?.mfa_required === true || 
+        (err instanceof Error && (err as any).mfa_required === true) ||
+        (err?.response?.data?.mfa_required === true) ||
+        (err?.response?.status === 401 && err?.response?.data?.mfa_required === true);
+      
+      console.log('Checking MFA requirement:', {
+        err,
+        mfa_required: err?.mfa_required,
+        isMfaRequired,
+        response_data: err?.response?.data,
+        response_status: err?.response?.status,
+      });
       
       if (isMfaRequired) {
         console.log('MFA required - showing MFA input');
@@ -112,13 +235,59 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       } else {
         // エラーを設定（詳細なエラーメッセージを表示）
         let errorMessage = '';
+        
+        // エラーメッセージを抽出（複数の形式に対応）
         if (err instanceof Error) {
           errorMessage = err.message;
-        } else if (typeof err === 'object' && err !== null && 'message' in err) {
-          errorMessage = String(err.message);
+        } else if (err?.response?.data) {
+          // レスポンスデータがある場合
+          const errorData = err.response.data;
+          if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } else if (typeof err === 'object' && err !== null) {
+          // オブジェクトの場合、messageプロパティを確認
+          if ('message' in err) {
+            errorMessage = String(err.message);
+          } else if ('error' in err) {
+            errorMessage = String(err.error);
+          } else {
+            // オブジェクト全体を文字列化するのではなく、デフォルトメッセージを使用
+            errorMessage = isRegisterMode ? 'Registration failed' : 'Login failed';
+          }
         } else {
           errorMessage = isRegisterMode ? 'Registration failed' : 'Login failed';
         }
+        
+        // エラーメッセージが空の場合はデフォルトメッセージを使用
+        if (!errorMessage || errorMessage === '[object Object]') {
+          errorMessage = isRegisterMode ? '登録に失敗しました。入力内容を確認して再度お試しください。' : 'ログインに失敗しました。ユーザー名とパスワードを確認して再度お試しください。';
+        }
+        
+        // 登録エラーの場合、日本語メッセージに変換
+        if (isRegisterMode) {
+          if (errorMessage.includes('Username already exists') || errorMessage.includes('already exists')) {
+            errorMessage = 'このユーザー名は既に使用されています。ログインしてください。';
+          } else if (errorMessage.includes('Email already exists')) {
+            errorMessage = 'このメールアドレスは既に使用されています。ログインしてください。';
+          } else if (errorMessage.includes('Username must be at least')) {
+            errorMessage = 'ユーザー名は3文字以上である必要があります。';
+          } else if (errorMessage.includes('Password must be at least')) {
+            errorMessage = 'パスワードは8文字以上である必要があります。';
+          } else if (errorMessage.includes('Invalid email address')) {
+            errorMessage = 'メールアドレスの形式が正しくありません。';
+          }
+        }
+        
+        // ログインエラーの場合、追加の情報を提供
+        if (!isRegisterMode && errorMessage.includes('Invalid username or password')) {
+          errorMessage = 'ユーザー名またはパスワードが正しくありません。新規登録した場合は、登録成功時に自動的にログインされます。再度ログインする場合は、登録時に使用したユーザー名とパスワードを入力してください。';
+        }
+        
         console.error('Auth error:', err);
         setError(errorMessage);
         // MFA状態をリセット（エラーの場合）

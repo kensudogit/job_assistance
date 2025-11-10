@@ -252,7 +252,16 @@ export interface PreDepartureSupport {
   notes?: string;
 }
 
+/**
+ * 進捗管理API
+ * 就労者の進捗記録を管理するAPIクライアント
+ */
 export const progressApi = {
+  /**
+   * 指定された就労者のすべての進捗記録を取得
+   * @param workerId - 就労者ID
+   * @returns 進捗記録の配列
+   */
   getAll: async (workerId: number): Promise<WorkerProgress[]> => {
     const response = await api.get<ApiResponse<WorkerProgress[]>>(`/api/workers/${workerId}/progress`);
     if (response.data.success && response.data.data) {
@@ -261,6 +270,12 @@ export const progressApi = {
     throw new Error(response.data.error || 'Failed to fetch progress');
   },
 
+  /**
+   * 指定された進捗記録を取得
+   * @param workerId - 就労者ID
+   * @param progressId - 進捗記録ID
+   * @returns 進捗記録
+   */
   getById: async (workerId: number, progressId: number): Promise<WorkerProgress> => {
     const response = await api.get<ApiResponse<WorkerProgress>>(`/api/workers/${workerId}/progress/${progressId}`);
     if (response.data.success && response.data.data) {
@@ -269,6 +284,11 @@ export const progressApi = {
     throw new Error(response.data.error || 'Failed to fetch progress');
   },
 
+  /**
+   * 新しい進捗記録を作成
+   * @param progress - 進捗記録データ
+   * @returns 作成された進捗記録
+   */
   create: async (progress: WorkerProgress): Promise<WorkerProgress> => {
     const response = await api.post<ApiResponse<WorkerProgress>>(
       `/api/workers/${progress.worker_id}/progress`,
@@ -280,6 +300,13 @@ export const progressApi = {
     throw new Error(response.data.error || 'Failed to create progress');
   },
 
+  /**
+   * 進捗記録を更新
+   * @param workerId - 就労者ID
+   * @param progressId - 進捗記録ID
+   * @param progress - 更新する進捗記録データ（部分更新可能）
+   * @returns 更新された進捗記録
+   */
   update: async (workerId: number, progressId: number, progress: Partial<WorkerProgress>): Promise<WorkerProgress> => {
     const response = await api.put<ApiResponse<WorkerProgress>>(
       `/api/workers/${workerId}/progress/${progressId}`,
@@ -291,6 +318,11 @@ export const progressApi = {
     throw new Error(response.data.error || 'Failed to update progress');
   },
 
+  /**
+   * 進捗記録を削除
+   * @param workerId - 就労者ID
+   * @param progressId - 進捗記録ID
+   */
   delete: async (workerId: number, progressId: number): Promise<void> => {
     const response = await api.delete<ApiResponse<void>>(`/api/workers/${workerId}/progress/${progressId}`);
     if (!response.data.success) {
@@ -299,7 +331,16 @@ export const progressApi = {
   },
 };
 
+/**
+ * 日本語能力管理API
+ * 就労者の日本語能力記録を管理するAPIクライアント
+ */
 export const japaneseProficiencyApi = {
+  /**
+   * 指定された就労者のすべての日本語能力記録を取得
+   * @param workerId - 就労者ID
+   * @returns 日本語能力記録の配列
+   */
   getAll: async (workerId: number): Promise<JapaneseProficiency[]> => {
     const response = await api.get<ApiResponse<JapaneseProficiency[]>>(`/api/workers/${workerId}/japanese-proficiency`);
     if (response.data.success && response.data.data) {
@@ -308,6 +349,12 @@ export const japaneseProficiencyApi = {
     throw new Error(response.data.error || 'Failed to fetch proficiencies');
   },
 
+  /**
+   * 指定された日本語能力記録を取得
+   * @param workerId - 就労者ID
+   * @param proficiencyId - 日本語能力記録ID
+   * @returns 日本語能力記録
+   */
   getById: async (workerId: number, proficiencyId: number): Promise<JapaneseProficiency> => {
     const response = await api.get<ApiResponse<JapaneseProficiency>>(`/api/workers/${workerId}/japanese-proficiency/${proficiencyId}`);
     if (response.data.success && response.data.data) {
@@ -316,6 +363,11 @@ export const japaneseProficiencyApi = {
     throw new Error(response.data.error || 'Failed to fetch proficiency');
   },
 
+  /**
+   * 新しい日本語能力記録を作成
+   * @param proficiency - 日本語能力記録データ
+   * @returns 作成された日本語能力記録
+   */
   create: async (proficiency: JapaneseProficiency): Promise<JapaneseProficiency> => {
     const response = await api.post<ApiResponse<JapaneseProficiency>>(
       `/api/workers/${proficiency.worker_id}/japanese-proficiency`,
@@ -327,6 +379,13 @@ export const japaneseProficiencyApi = {
     throw new Error(response.data.error || 'Failed to create proficiency');
   },
 
+  /**
+   * 日本語能力記録を更新
+   * @param workerId - 就労者ID
+   * @param proficiencyId - 日本語能力記録ID
+   * @param proficiency - 更新する日本語能力記録データ（部分更新可能）
+   * @returns 更新された日本語能力記録
+   */
   update: async (workerId: number, proficiencyId: number, proficiency: Partial<JapaneseProficiency>): Promise<JapaneseProficiency> => {
     const response = await api.put<ApiResponse<JapaneseProficiency>>(
       `/api/workers/${workerId}/japanese-proficiency/${proficiencyId}`,
@@ -338,6 +397,11 @@ export const japaneseProficiencyApi = {
     throw new Error(response.data.error || 'Failed to update proficiency');
   },
 
+  /**
+   * 日本語能力記録を削除
+   * @param workerId - 就労者ID
+   * @param proficiencyId - 日本語能力記録ID
+   */
   delete: async (workerId: number, proficiencyId: number): Promise<void> => {
     const response = await api.delete<ApiResponse<void>>(`/api/workers/${workerId}/japanese-proficiency/${proficiencyId}`);
     if (!response.data.success) {
@@ -346,7 +410,16 @@ export const japaneseProficiencyApi = {
   },
 };
 
+/**
+ * 技能訓練管理API
+ * 就労者の技能訓練記録を管理するAPIクライアント
+ */
 export const skillTrainingApi = {
+  /**
+   * 指定された就労者のすべての技能訓練記録を取得
+   * @param workerId - 就労者ID
+   * @returns 技能訓練記録の配列
+   */
   getAll: async (workerId: number): Promise<SkillTraining[]> => {
     const response = await api.get<ApiResponse<SkillTraining[]>>(`/api/workers/${workerId}/skill-training`);
     if (response.data.success && response.data.data) {
@@ -355,6 +428,12 @@ export const skillTrainingApi = {
     throw new Error(response.data.error || 'Failed to fetch trainings');
   },
 
+  /**
+   * 指定された技能訓練記録を取得
+   * @param workerId - 就労者ID
+   * @param trainingId - 技能訓練記録ID
+   * @returns 技能訓練記録
+   */
   getById: async (workerId: number, trainingId: number): Promise<SkillTraining> => {
     const response = await api.get<ApiResponse<SkillTraining>>(`/api/workers/${workerId}/skill-training/${trainingId}`);
     if (response.data.success && response.data.data) {
@@ -363,6 +442,11 @@ export const skillTrainingApi = {
     throw new Error(response.data.error || 'Failed to fetch training');
   },
 
+  /**
+   * 新しい技能訓練記録を作成
+   * @param training - 技能訓練記録データ
+   * @returns 作成された技能訓練記録
+   */
   create: async (training: SkillTraining): Promise<SkillTraining> => {
     const response = await api.post<ApiResponse<SkillTraining>>(
       `/api/workers/${training.worker_id}/skill-training`,
@@ -374,6 +458,13 @@ export const skillTrainingApi = {
     throw new Error(response.data.error || 'Failed to create training');
   },
 
+  /**
+   * 技能訓練記録を更新
+   * @param workerId - 就労者ID
+   * @param trainingId - 技能訓練記録ID
+   * @param training - 更新する技能訓練記録データ（部分更新可能）
+   * @returns 更新された技能訓練記録
+   */
   update: async (workerId: number, trainingId: number, training: Partial<SkillTraining>): Promise<SkillTraining> => {
     const response = await api.put<ApiResponse<SkillTraining>>(
       `/api/workers/${workerId}/skill-training/${trainingId}`,
@@ -385,6 +476,11 @@ export const skillTrainingApi = {
     throw new Error(response.data.error || 'Failed to update training');
   },
 
+  /**
+   * 技能訓練記録を削除
+   * @param workerId - 就労者ID
+   * @param trainingId - 技能訓練記録ID
+   */
   delete: async (workerId: number, trainingId: number): Promise<void> => {
     const response = await api.delete<ApiResponse<void>>(`/api/workers/${workerId}/skill-training/${trainingId}`);
     if (!response.data.success) {
@@ -393,7 +489,16 @@ export const skillTrainingApi = {
   },
 };
 
+/**
+ * 日本語学習記録管理API
+ * 就労者の日本語学習記録を管理するAPIクライアント
+ */
 export const japaneseLearningApi = {
+  /**
+   * 指定された就労者のすべての日本語学習記録を取得
+   * @param workerId - 就労者ID
+   * @returns 日本語学習記録の配列
+   */
   getAll: async (workerId: number): Promise<JapaneseLearningRecord[]> => {
     const response = await api.get<ApiResponse<JapaneseLearningRecord[]>>(`/api/workers/${workerId}/japanese-learning`);
     if (response.data.success && response.data.data) {
@@ -402,6 +507,11 @@ export const japaneseLearningApi = {
     throw new Error(response.data.error || 'Failed to fetch learning records');
   },
 
+  /**
+   * 新しい日本語学習記録を作成
+   * @param record - 日本語学習記録データ
+   * @returns 作成された日本語学習記録
+   */
   create: async (record: JapaneseLearningRecord): Promise<JapaneseLearningRecord> => {
     const response = await api.post<ApiResponse<JapaneseLearningRecord>>(
       `/api/workers/${record.worker_id}/japanese-learning`,
@@ -414,7 +524,16 @@ export const japaneseLearningApi = {
   },
 };
 
+/**
+ * 来日前支援管理API
+ * 就労者の来日前支援記録を管理するAPIクライアント
+ */
 export const preDepartureSupportApi = {
+  /**
+   * 指定された就労者のすべての来日前支援記録を取得
+   * @param workerId - 就労者ID
+   * @returns 来日前支援記録の配列
+   */
   getAll: async (workerId: number): Promise<PreDepartureSupport[]> => {
     const response = await api.get<ApiResponse<PreDepartureSupport[]>>(`/api/workers/${workerId}/pre-departure-support`);
     if (response.data.success && response.data.data) {
@@ -423,6 +542,11 @@ export const preDepartureSupportApi = {
     throw new Error(response.data.error || 'Failed to fetch pre-departure supports');
   },
 
+  /**
+   * 新しい来日前支援記録を作成
+   * @param support - 来日前支援記録データ
+   * @returns 作成された来日前支援記録
+   */
   create: async (support: PreDepartureSupport): Promise<PreDepartureSupport> => {
     const response = await api.post<ApiResponse<PreDepartureSupport>>(
       `/api/workers/${support.worker_id}/pre-departure-support`,

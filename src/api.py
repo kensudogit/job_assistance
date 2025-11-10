@@ -414,7 +414,7 @@ class WorkerResource(Resource):
         """就労者を削除"""
         session = db.get_session()
         try:
-            worker = session.query(Worker).filter(Worker.id == worker_id).first()
+            wor　ker = session.query(Worker).filter(Worker.id == worker_id).first()
             
             if not worker:
                 return {'success': False, 'error': 'Worker not found'}, 404
@@ -583,7 +583,7 @@ class WorkerProgressResource(Resource):
             progress = session.query(WorkerProgress).filter(
                 WorkerProgress.id == progress_id,
                 WorkerProgress.worker_id == worker_id
-            ).first()
+            )　.first()
             
             if not progress:
                 return {'success': False, 'error': 'Progress not found'}, 404
@@ -930,6 +930,16 @@ class JapaneseProficiencyListResource(Resource):
             session.close()
     
     def _serialize(self, p):
+        """
+        日本語能力記録をシリアライズ
+        JapaneseProficiencyオブジェクトを辞書形式に変換
+        
+        Args:
+            p: JapaneseProficiencyオブジェクト
+        
+        Returns:
+            dict: シリアライズされた日本語能力記録データ
+        """
         return {
             'id': p.id,
             'worker_id': p.worker_id,
@@ -952,7 +962,22 @@ class JapaneseProficiencyListResource(Resource):
 
 # 技能訓練管理API
 class SkillTrainingListResource(Resource):
+    """
+    技能訓練一覧API
+    就労者の技能訓練記録を管理するエンドポイント
+    """
+    
     def get(self, worker_id):
+        """
+        GET /api/workers/<worker_id>/skill-training
+        指定された就労者の技能訓練記録一覧を取得
+        
+        Args:
+            worker_id: 就労者ID
+        
+        Returns:
+            dict: 技能訓練記録一覧
+        """
         session = db.get_session()
         try:
             trainings = session.query(SkillTraining).filter(
@@ -965,6 +990,16 @@ class SkillTrainingListResource(Resource):
             session.close()
     
     def post(self, worker_id):
+        """
+        POST /api/workers/<worker_id>/skill-training
+        新しい技能訓練記録を作成
+        
+        Args:
+            worker_id: 就労者ID
+        
+        Returns:
+            dict: 作成された技能訓練記録
+        """
         session = db.get_session()
         try:
             data = request.get_json()
@@ -995,6 +1030,16 @@ class SkillTrainingListResource(Resource):
             session.close()
     
     def _serialize(self, t):
+        """
+        技能訓練記録をシリアライズ
+        SkillTrainingオブジェクトを辞書形式に変換
+        
+        Args:
+            t: SkillTrainingオブジェクト
+        
+        Returns:
+            dict: シリアライズされた技能訓練記録データ
+        """
         return {
             'id': t.id,
             'worker_id': t.worker_id,
@@ -1019,7 +1064,22 @@ class SkillTrainingListResource(Resource):
 
 # 日本語学習記録API
 class JapaneseLearningRecordListResource(Resource):
+    """
+    日本語学習記録一覧API
+    就労者の日本語学習記録を管理するエンドポイント
+    """
+    
     def get(self, worker_id):
+        """
+        GET /api/workers/<worker_id>/japanese-learning
+        指定された就労者の日本語学習記録一覧を取得
+        
+        Args:
+            worker_id: 就労者ID
+        
+        Returns:
+            dict: 日本語学習記録一覧
+        """
         session = db.get_session()
         try:
             records = session.query(JapaneseLearningRecord).filter(
@@ -1032,6 +1092,16 @@ class JapaneseLearningRecordListResource(Resource):
             session.close()
     
     def post(self, worker_id):
+        """
+        POST /api/workers/<worker_id>/japanese-learning
+        新しい日本語学習記録を作成
+        
+        Args:
+            worker_id: 就労者ID
+        
+        Returns:
+            dict: 作成された日本語学習記録
+        """
         session = db.get_session()
         try:
             data = request.get_json()
@@ -1062,6 +1132,16 @@ class JapaneseLearningRecordListResource(Resource):
             session.close()
     
     def _serialize(self, r):
+        """
+        日本語学習記録をシリアライズ
+        JapaneseLearningRecordオブジェクトを辞書形式に変換
+        
+        Args:
+            r: JapaneseLearningRecordオブジェクト
+        
+        Returns:
+            dict: シリアライズされた日本語学習記録データ
+        """
         return {
             'id': r.id,
             'worker_id': r.worker_id,
@@ -1086,7 +1166,22 @@ class JapaneseLearningRecordListResource(Resource):
 
 # 来日前支援API
 class PreDepartureSupportListResource(Resource):
+    """
+    来日前支援一覧API
+    就労者の来日前支援記録を管理するエンドポイント
+    """
+    
     def get(self, worker_id):
+        """
+        GET /api/workers/<worker_id>/pre-departure-support
+        指定された就労者の来日前支援記録一覧を取得
+        
+        Args:
+            worker_id: 就労者ID
+        
+        Returns:
+            dict: 来日前支援記録一覧
+        """
         session = db.get_session()
         try:
             supports = session.query(PreDepartureSupport).filter(
@@ -1099,6 +1194,16 @@ class PreDepartureSupportListResource(Resource):
             session.close()
     
     def post(self, worker_id):
+        """
+        POST /api/workers/<worker_id>/pre-departure-support
+        新しい来日前支援記録を作成
+        
+        Args:
+            worker_id: 就労者ID
+        
+        Returns:
+            dict: 作成された来日前支援記録
+        """
         session = db.get_session()
         try:
             data = request.get_json()
@@ -1125,6 +1230,16 @@ class PreDepartureSupportListResource(Resource):
             session.close()
     
     def _serialize(self, s):
+        """
+        来日前支援記録をシリアライズ
+        PreDepartureSupportオブジェクトを辞書形式に変換
+        
+        Args:
+            s: PreDepartureSupportオブジェクト
+        
+        Returns:
+            dict: シリアライズされた来日前支援記録データ
+        """
         return {
             'id': s.id,
             'worker_id': s.worker_id,

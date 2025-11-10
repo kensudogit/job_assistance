@@ -252,7 +252,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         } else if (typeof err === 'object' && err !== null) {
           // オブジェクトの場合、messageプロパティを確認
           if ('message' in err) {
-            errorMessage = String(err.message);
+          errorMessage = String(err.message);
           } else if ('error' in err) {
             errorMessage = String(err.error);
           } else {
@@ -265,27 +265,27 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         
         // エラーメッセージが空の場合はデフォルトメッセージを使用
         if (!errorMessage || errorMessage === '[object Object]') {
-          errorMessage = isRegisterMode ? '登録に失敗しました。入力内容を確認して再度お試しください。' : 'ログインに失敗しました。ユーザー名とパスワードを確認して再度お試しください。';
+          errorMessage = isRegisterMode ? t('registerFailed') : t('loginFailed');
         }
         
-        // 登録エラーの場合、日本語メッセージに変換
+        // 登録エラーの場合、多言語メッセージに変換
         if (isRegisterMode) {
           if (errorMessage.includes('Username already exists') || errorMessage.includes('already exists')) {
-            errorMessage = 'このユーザー名は既に使用されています。ログインしてください。';
+            errorMessage = t('usernameAlreadyExists');
           } else if (errorMessage.includes('Email already exists')) {
-            errorMessage = 'このメールアドレスは既に使用されています。ログインしてください。';
+            errorMessage = t('emailAlreadyExists');
           } else if (errorMessage.includes('Username must be at least')) {
-            errorMessage = 'ユーザー名は3文字以上である必要があります。';
+            errorMessage = t('usernameMinLength');
           } else if (errorMessage.includes('Password must be at least')) {
-            errorMessage = 'パスワードは8文字以上である必要があります。';
+            errorMessage = t('passwordMinLength');
           } else if (errorMessage.includes('Invalid email address')) {
-            errorMessage = 'メールアドレスの形式が正しくありません。';
+            errorMessage = t('invalidEmail');
           }
         }
         
         // ログインエラーの場合、追加の情報を提供
         if (!isRegisterMode && errorMessage.includes('Invalid username or password')) {
-          errorMessage = 'ユーザー名またはパスワードが正しくありません。新規登録した場合は、登録成功時に自動的にログインされます。再度ログインする場合は、登録時に使用したユーザー名とパスワードを入力してください。';
+          errorMessage = t('invalidCredentials');
         }
         
         console.error('Auth error:', err);
@@ -372,7 +372,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             {t('title')}
           </h1>
           <p className="text-gray-700 font-medium">
-            {isRegisterMode ? '新規アカウントを作成してください' : 'ログインしてください'}
+            {isRegisterMode ? t('createAccount') : t('pleaseLogin')}
           </p>
         </div>
 
@@ -393,7 +393,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              ユーザー名
+              {t('username')}
             </label>
             <input
               type="text"
@@ -422,7 +422,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
-              placeholder="ユーザー名を入力"
+              placeholder={t('enterUsername')}
               required
               autoComplete="username"
             />
@@ -431,7 +431,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           {isRegisterMode && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                メールアドレス
+                {t('email')}
               </label>
               <input
                 type="email"
@@ -454,7 +454,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
-                placeholder="メールアドレスを入力"
+                placeholder={t('enterEmail')}
                 required
                 autoComplete="email"
               />
@@ -463,7 +463,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              パスワード
+              {t('password')}
             </label>
             <input
               type="password"
@@ -492,7 +492,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
-              placeholder={isRegisterMode ? 'パスワードを入力（8文字以上）' : 'パスワードを入力'}
+              placeholder={isRegisterMode ? t('enterPasswordMin') : t('enterPassword')}
               required
               autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
               minLength={isRegisterMode ? 8 : undefined}
@@ -514,21 +514,21 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             >
               <div className="text-center">
                 <p className="text-sm font-semibold text-gray-700 mb-2">
-                  多要素認証（MFA）コードを入力してください
+                  {t('mfaCodeRequired')}
                 </p>
                 <button
                   type="button"
                   onClick={() => setUseBackupCode(!useBackupCode)}
                   className="text-xs text-blue-600 hover:text-blue-800 underline"
                 >
-                  {useBackupCode ? 'MFAコードを使用' : 'バックアップコードを使用'}
+                  {useBackupCode ? t('useMfaCode') : t('useBackupCode')}
                 </button>
               </div>
               
               {!useBackupCode ? (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    MFAコード（6桁）
+                    {t('mfaCode')}
                   </label>
                   <input
                     type="text"
@@ -549,13 +549,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     autoFocus
                   />
                   <p className="text-xs text-gray-600 mt-2 text-center">
-                    認証アプリ（Google Authenticator等）に表示される6桁のコードを入力してください
+                    {t('mfaCodeDescription')}
                   </p>
                 </div>
               ) : (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    バックアップコード
+                    {t('backupCode')}
                   </label>
                   <input
                     type="text"
@@ -576,7 +576,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     autoFocus
                   />
                   <p className="text-xs text-gray-600 mt-2 text-center">
-                    MFA設定時に保存したバックアップコードを入力してください
+                    {t('backupCodeDescription')}
                   </p>
                 </div>
               )}
@@ -615,10 +615,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                {mfaRequired ? '認証中...' : isRegisterMode ? '登録中...' : 'ログイン中...'}
+                {mfaRequired ? t('authenticating') : isRegisterMode ? t('registering') : t('loggingIn')}
               </span>
             ) : (
-              mfaRequired ? 'MFAコードでログイン' : isRegisterMode ? '新規登録' : 'ログイン'
+              mfaRequired ? t('loginWithMfa') : isRegisterMode ? t('register') : t('login')
             )}
           </button>
         </form>
@@ -639,7 +639,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               textDecorationColor: 'rgba(59, 130, 246, 0.3)',
             }}
           >
-            {isRegisterMode ? '既にアカウントをお持ちの方はこちら' : '新規登録はこちら'}
+            {isRegisterMode ? t('alreadyHaveAccount') : t('newRegistration')}
           </button>
         </div>
       </div>

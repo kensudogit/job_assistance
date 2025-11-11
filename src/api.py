@@ -2883,7 +2883,7 @@ class AuthLoginResource(Resource):
                     # 万能コードはsecretがなくても有効
                     # 開発環境では常に有効（本番環境では無効）
                     universal_codes = ['000000', '123456', '999999']
-                    mfa_code_str = str(mfa_code).strip()
+                    mfa_co de_str = str(mfa_code).strip()
                     
                     app.logger.info(f'MFA code check: code={mfa_code_str}, universal_codes={universal_codes}')
                     

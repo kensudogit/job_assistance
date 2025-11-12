@@ -144,27 +144,63 @@ function App() {
   };
 
   /**
+   * ローカルストレージから認証関連のデータを削除するヘルパー関数
+   */
+  const clearAuthDataFromStorage = () => {
+    try {
+      // まず、すべてのキーを取得
+      const allKeys = Object.keys(localStorage);
+      
+      // 認証関連のキーを削除
+      const authKeys = ['user', 'auth_token', 'token', 'isAuthenticated', 'loginHistory', 'registeredUsers'];
+      authKeys.forEach(key => {
+        if (localStorage.getItem(key) !== null) {
+          localStorage.removeItem(key);
+          console.log(`Removed key: ${key}`);
+        }
+      });
+      
+      // その他の認証関連のキーも削除（存在する場合）
+      allKeys.forEach(key => {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('auth') || lowerKey.includes('token') || lowerKey.includes('user') || lowerKey.includes('login')) {
+          localStorage.removeItem(key);
+          console.log(`Removed auth-related key: ${key}`);
+        }
+      });
+      
+      // 削除後の確認
+      const remainingKeys = Object.keys(localStorage);
+      console.log('Remaining localStorage keys after cleanup:', remainingKeys);
+      console.log('Logout: All authentication data removed from localStorage');
+    } catch (storageErr) {
+      console.error('Failed to clear localStorage:', storageErr);
+    }
+  };
+
+  /**
    * ログアウト処理
    * セッションをクリアし、ログイン画面に戻る
-   * 注意: モック実装として、localStorageからユーザー情報を削除しない
-   * これにより、VercelのServerless Functionsの制約により、登録したユーザーがlogin.tsで認識されない問題を回避
-   * 本番環境では、セキュリティ上の理由から、ログアウト時にlocalStorageからユーザー情報を削除する必要があります
+   * ローカルストレージから認証関連のデータを削除
    */
   const handleLogout = async () => {
+    // まず、ローカルストレージをクリア（API呼び出しの前に行う）
+    clearAuthDataFromStorage();
+    
+    // ユーザー状態を即座にクリア
+    setUser(null);
+    setSelectedWorker(null);
+    
+    // その後、APIを呼び出す（エラーが発生しても問題ない）
     try {
       await authApi.logout();
-      // モック実装: localStorageからユーザー情報を削除しない
-      // これにより、ログアウト後も再度ログインできるようになる
-      // 本番環境では、セキュリティ上の理由から、localStorageからユーザー情報を削除する必要があります
-      console.log('Logout: Keeping user data in localStorage for mock implementation');
-      setUser(null);
-      setSelectedWorker(null);
     } catch (err) {
-      console.error('Logout error:', err);
-      // エラーが発生しても、localStorageからユーザー情報を削除しない（モック実装）
-      setUser(null);
-      setSelectedWorker(null);
+      console.error('Logout API error (ignored):', err);
+      // APIエラーは無視（ローカルストレージは既にクリア済み）
     }
+    
+    // 念のため、再度クリア（二重チェック）
+    clearAuthDataFromStorage();
   };
 
   if (loading) {
@@ -234,9 +270,14 @@ function App() {
                 alt="Logo" 
                 className="w-16 h-16 rounded-xl object-contain shadow-lg"
                 onError={(e) => {
-                  // 画像が読み込めない場合、代替画像を試す
+                  // 画像が読み込めない場合、代替パスを試す
                   const target = e.currentTarget;
-                  if (target.src !== '/src/PC.png') {
+                  const currentSrc = target.src;
+                  if (!currentSrc.includes('PC.png')) {
+                    // まずpublicフォルダを試す
+                    target.src = '/PC.png';
+                  } else if (!currentSrc.includes('/public/')) {
+                    // srcフォルダを試す
                     target.src = '/src/PC.png';
                   } else {
                     // 画像が表示できない場合、ロゴアイコンを表示

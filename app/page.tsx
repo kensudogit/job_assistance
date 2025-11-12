@@ -17,7 +17,7 @@ import TrainingSessionDetail from '@/components/TrainingSessionDetail';
 import TrainingMenuAssignmentComponent from '@/components/TrainingMenuAssignment';
 import LanguageSelector from '@/components/LanguageSelector';
 
-type TabType = 'progress' | 'japanese' | 'skill' | 'dashboard' | 'training' | 'milestone' | 'career' | 'report' | 'sessions' | 'assignment';
+type TabType = 'progress' | 'japanese' | 'skill' | 'dashboard' | 'milestone' | 'career' | 'report' | 'sessions' | 'assignment';
 
 export default function Home() {
   const { t } = useTranslation();
@@ -99,30 +99,31 @@ export default function Home() {
               />
             </div>
             <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
-              {selectedWorker ? (
-                <div className="space-y-6">
-                  {/* タブナビゲーション */}
-                  <div className="glass rounded-xl p-2 flex gap-2 flex-wrap">
-                    <button
-                      onClick={() => setActiveTab('dashboard')}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
-                        activeTab === 'dashboard'
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
-                          : 'text-gray-700 hover:bg-gray-100 hover:scale-105'
-                      }`}
-                    >
-                      {t('integratedDashboard')}
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('progress')}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
-                        activeTab === 'progress'
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
-                          : 'text-gray-700 hover:bg-gray-100 hover:scale-105'
-                      }`}
-                    >
-                      {t('progressManagement')}
-                    </button>
+              <div className="space-y-6">
+                {/* タブナビゲーション */}
+                <div className="glass rounded-xl p-2 flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
+                      activeTab === 'dashboard'
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
+                        : 'text-gray-700 hover:bg-gray-100 hover:scale-105'
+                    }`}
+                  >
+                    {t('integratedDashboard')}
+                  </button>
+                  {selectedWorker && (
+                    <>
+                      <button
+                        onClick={() => setActiveTab('progress')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
+                          activeTab === 'progress'
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
+                            : 'text-gray-700 hover:bg-gray-100 hover:scale-105'
+                        }`}
+                      >
+                        {t('progressManagement')}
+                      </button>
                     <button
                       onClick={() => setActiveTab('japanese')}
                       className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
@@ -183,59 +184,55 @@ export default function Home() {
                     >
                       {t('trainingSessions')}
                     </button>
-                    <button
-                      onClick={() => setActiveTab('assignment')}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
-                        activeTab === 'assignment'
-                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg scale-105'
-                          : 'text-gray-700 hover:bg-gray-100 hover:scale-105'
-                      }`}
-                    >
-                      {t('trainingMenuAssignment')}
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => setActiveTab('assignment')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 text-sm ${
+                          activeTab === 'assignment'
+                            ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg scale-105'
+                            : 'text-gray-700 hover:bg-gray-100 hover:scale-105'
+                        }`}
+                      >
+                        {t('trainingMenuAssignment')}
+                      </button>
+                    </>
+                  )}
+                </div>
 
-                  {/* タブコンテンツ */}
-                  <div className="animate-fade-in">
-                    {activeTab === 'dashboard' && (
-                      <IntegratedDashboard workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'progress' && (
-                      <ProgressManagement workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'japanese' && (
-                      <JapaneseProficiencyManagement workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'skill' && (
-                      <SkillTrainingManagement workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'milestone' && (
-                      <MilestoneManagement workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'career' && (
-                      <CareerPathTimeline workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'report' && (
-                      <EvidenceReport workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'sessions' && (
-                      <TrainingSessionDetail workerId={selectedWorker} />
-                    )}
-                    {activeTab === 'assignment' && (
-                      <TrainingMenuAssignmentComponent workerId={selectedWorker} />
-                    )}
-                  </div>
+                {/* タブコンテンツ */}
+                <div className="animate-fade-in">
+                  {activeTab === 'dashboard' && (
+                    <IntegratedDashboard key={`dashboard-${selectedWorker || 0}`} workerId={selectedWorker || 0} />
+                  )}
+                  {selectedWorker && (
+                    <>
+                      {activeTab === 'progress' && (
+                        <ProgressManagement workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'japanese' && (
+                        <JapaneseProficiencyManagement workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'skill' && (
+                        <SkillTrainingManagement workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'milestone' && (
+                        <MilestoneManagement workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'career' && (
+                        <CareerPathTimeline workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'report' && (
+                        <EvidenceReport workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'sessions' && (
+                        <TrainingSessionDetail workerId={selectedWorker} />
+                      )}
+                      {activeTab === 'assignment' && (
+                        <TrainingMenuAssignmentComponent workerId={selectedWorker} />
+                      )}
+                    </>
+                  )}
                 </div>
-              ) : (
-                <div className="glass rounded-2xl p-12 text-center card-hover">
-                  <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-                    <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-600 text-lg font-medium">{t('selectWorker')}</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -243,4 +240,3 @@ export default function Home() {
     </main>
   );
 }
-

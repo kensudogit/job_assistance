@@ -10,8 +10,15 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
+    "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "test:all": "vitest run --reporter=verbose",
+    "test:suite": "vitest run tests/test-suite.ts",
+    "test:components": "vitest run components/__test__",
+    "test:lib": "vitest run lib/__test__",
+    "test:summary": "vitest run tests/test-summary.ts",
+    "test:master": "vitest run tests/test-master.ts",
     "deploy": "vercel --prod",
     "deploy:preview": "vercel"
   },
@@ -42,6 +49,7 @@
     "jsdom": "^27.1.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.16",
+    "vercel": "^48.9.0",
     "vite": "^7.2.0",
     "vitest": "^4.0.7"
   }

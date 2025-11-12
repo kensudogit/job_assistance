@@ -33,5 +33,5 @@ RUN chmod +x /docker-entrypoint.sh
 
 # 起動コマンド
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["python", "-m", "src.api"]
+CMD []
 

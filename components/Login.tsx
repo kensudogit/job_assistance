@@ -136,26 +136,36 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         };
         const user = await authApi.login(loginCredentials);
         
-        // ログイン成功時、localStorageからパスワードを含むユーザー情報を取得
-        // これにより、パスワードが保持される
+        // ログイン成功時、パスワードを含むユーザー情報を作成
+        // 既存のlocalStorageからパスワードを取得、なければ入力されたパスワードを使用
         let userWithPassword = user;
         try {
           const existingUserData = localStorage.getItem('user');
+          let passwordToSave = credentials.password; // デフォルトは入力されたパスワード
+          
           if (existingUserData) {
             try {
               const parsedExistingUser = JSON.parse(existingUserData);
-              // ユーザー名が一致し、パスワードが含まれている場合は、パスワードを含むユーザー情報を使用
+              // ユーザー名が一致し、パスワードが含まれている場合は、既存のパスワードを使用
               if (parsedExistingUser.username === user.username && parsedExistingUser.password) {
-                userWithPassword = {
-                  ...user,
-                  password: parsedExistingUser.password,
-                };
-                console.log('Using user data with password from localStorage');
+                passwordToSave = parsedExistingUser.password;
+                console.log('Using password from existing localStorage');
+              } else {
+                console.log('Using input password (no existing password found)');
               }
             } catch (err) {
               console.error('Failed to parse existing user:', err);
+              console.log('Using input password (parse error)');
             }
+          } else {
+            console.log('Using input password (no existing user data)');
           }
+          
+          // パスワードを含むユーザー情報を作成
+          userWithPassword = {
+            ...user,
+            password: passwordToSave,
+          };
           
           // パスワードを含むユーザー情報をlocalStorageに保存
           const userJson = JSON.stringify(userWithPassword);
@@ -352,13 +362,36 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       >
         <div className="text-center mb-8">
           <div 
-            className="w-16 h-16 mx-auto mb-4 rounded-xl flex items-center justify-center shadow-lg"
+            className="w-16 h-16 mx-auto mb-4 rounded-xl flex items-center justify-center shadow-lg overflow-hidden"
             style={{
-              background: 'linear-gradient(135deg, #3b82f6, #4f46e5)',
+              background: 'rgba(255, 255, 255, 0.9)',
               animation: 'float 3s ease-in-out infinite',
             }}
           >
-            <span className="text-white font-bold text-2xl">就</span>
+            <img 
+              src="/PC.png" 
+              alt="Logo" 
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                // 画像が読み込めない場合、代替パスを試す
+                const target = e.currentTarget;
+                const currentSrc = target.src;
+                if (!currentSrc.includes('PC.png')) {
+                  // まずpublicフォルダを試す
+                  target.src = '/PC.png';
+                } else if (!currentSrc.includes('/public/')) {
+                  // srcフォルダを試す
+                  target.src = '/src/PC.png';
+                } else {
+                  // 画像が表示できない場合、フォールバック表示
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = '<span class="text-blue-600 font-bold text-2xl">就</span>';
+                  }
+                }
+              }}
+            />
           </div>
           <h1 
             className="text-3xl font-bold mb-2"

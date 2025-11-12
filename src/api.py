@@ -414,7 +414,7 @@ class WorkerResource(Resource):
         """就労者を削除"""
         session = db.get_session()
         try:
-            wor　ker = session.query(Worker).filter(Worker.id == worker_id).first()
+            worker = session.query(Worker).filter(Worker.id == worker_id).first()
             
             if not worker:
                 return {'success': False, 'error': 'Worker not found'}, 404
@@ -583,7 +583,7 @@ class WorkerProgressResource(Resource):
             progress = session.query(WorkerProgress).filter(
                 WorkerProgress.id == progress_id,
                 WorkerProgress.worker_id == worker_id
-            )　.first()
+            ).first()
             
             if not progress:
                 return {'success': False, 'error': 'Progress not found'}, 404
@@ -2042,8 +2042,24 @@ class IntegratedDashboardResource(Resource):
                     'data': {
                         'kpi_timeline': [],
                         'japanese_proficiency': [],
+                        'summary': {
+                            'total_sessions': 0,
+                            'total_training_hours': 0,
+                            'average_overall_score': 0,
+                            'latest_overall_score': None,
+                            'total_milestones': 0,
+                            'achieved_milestones': 0,
+                            'milestone_achievement_rate': 0,
+                        },
+                        'recent_milestones': [],
+                        'recent_progress': [],
                     }
                 }, 200
+            
+            # 作業員情報取得
+            worker = session.query(Worker).filter(Worker.id == worker_id).first()
+            if not worker:
+                return {'success': False, 'error': 'Worker not found'}, 404
             
             # 訓練セッションのKPI集計
             sessions = session.query(TrainingSession).filter(
@@ -2051,6 +2067,10 @@ class IntegratedDashboardResource(Resource):
             ).order_by(TrainingSession.session_start_time.desc()).limit(30).all()
             
             kpi_data = []
+            total_training_hours = 0
+            overall_scores = []
+            latest_overall_score = None
+            
             for s in sessions:
                 # kpi_scoresリレーションシップから最初のKPIスコアを取得
                 kpi_scores_list = list(s.kpi_scores) if s.kpi_scores else []
@@ -2064,6 +2084,17 @@ class IntegratedDashboardResource(Resource):
                         'achievement_rate': kpi.achievement_rate,
                         'overall_score': kpi.overall_score,
                     })
+                    if kpi.overall_score is not None:
+                        overall_scores.append(kpi.overall_score)
+                    if latest_overall_score is None and kpi.overall_score is not None:
+                        latest_overall_score = kpi.overall_score
+                
+                # 訓練時間を集計
+                if s.duration_seconds:
+                    total_training_hours += s.duration_seconds / 3600.0
+            
+            # 平均スコア計算
+            average_overall_score = sum(overall_scores) / len(overall_scores) if overall_scores else 0
             
             # 日本語能力データ
             proficiencies = session.query(JapaneseProficiency).filter(
@@ -2078,11 +2109,56 @@ class IntegratedDashboardResource(Resource):
                 'passed': p.passed,
             } for p in proficiencies]
             
+            # マイルストーン情報
+            milestones = session.query(Milestone).filter(
+                Milestone.worker_id == worker_id
+            ).order_by(Milestone.target_date.desc()).limit(10).all()
+            
+            achieved_count = sum(1 for m in milestones if m.status == '達成')
+            total_milestones = len(milestones)
+            milestone_achievement_rate = (achieved_count / total_milestones * 100) if total_milestones > 0 else 0
+            
+            recent_milestones = [{
+                'id': m.id,
+                'milestone_name': m.milestone_name,
+                'milestone_type': m.milestone_type,
+                'target_date': serialize_date(m.target_date),
+                'achieved_date': serialize_date(m.achieved_date),
+                'status': m.status,
+            } for m in milestones]
+            
+            # 最近の進捗記録
+            recent_progress = session.query(WorkerProgress).filter(
+                WorkerProgress.worker_id == worker_id
+            ).order_by(WorkerProgress.progress_date.desc()).limit(5).all()
+            
+            recent_progress_data = [{
+                'id': p.id,
+                'progress_date': serialize_date(p.progress_date),
+                'progress_type': p.progress_type,
+                'title': p.title,
+                'status': p.status,
+            } for p in recent_progress]
+            
+            # サマリー情報
+            summary = {
+                'total_sessions': len(sessions),
+                'total_training_hours': round(total_training_hours, 2),
+                'average_overall_score': round(average_overall_score, 1) if overall_scores else None,
+                'latest_overall_score': round(latest_overall_score, 1) if latest_overall_score is not None else None,
+                'total_milestones': total_milestones,
+                'achieved_milestones': achieved_count,
+                'milestone_achievement_rate': round(milestone_achievement_rate, 1),
+            }
+            
             return {
                 'success': True,
                 'data': {
                     'kpi_timeline': kpi_data,
                     'japanese_proficiency': japanese_data,
+                    'summary': summary,
+                    'recent_milestones': recent_milestones,
+                    'recent_progress': recent_progress_data,
                 }
             }, 200
         except Exception as e:
@@ -2833,11 +2909,11 @@ class AuthLoginResource(Resource):
             # 必須項目のチェック（検証前に）
             raw_username = data.get('username')
             password = data.get('password')
+            mfa_code = data.get('mfa_code')
+            backup_code = data.get('backup_code')
             
             if not raw_username:
                 return {'success': False, 'error': 'Username is required'}, 400
-            if not password:
-                return {'success': False, 'error': 'Password is required'}, 400
             
             # SQLインジェクション対策（入力検証）
             username = validate_sql_input(raw_username, field_type='string', max_length=100)
@@ -2858,23 +2934,51 @@ class AuthLoginResource(Resource):
             if not user.is_active:
                 return {'success': False, 'error': 'Account is inactive. Please contact administrator'}, 401
             
-            if not user.check_password(password):
-                app.logger.warning(f'Login failed: invalid password for username={username}')
-                return {'success': False, 'error': 'Invalid username or password'}, 401
+            # パスワードが設定されているかチェック
+            has_password = user.password_hash is not None and user.password_hash != ''
             
-            # MFAが有効な場合、MFAコードまたはバックアップコードを検証
+            # MFAが有効な場合の処理
             if user.mfa_enabled:
-                data = request.get_json()
-                mfa_code = data.get('mfa_code')
-                backup_code = data.get('backup_code')
-                
                 # MFAコードまたはバックアップコードが提供されていない場合
                 if not mfa_code and not backup_code:
+                    # パスワードが設定されていない場合は、MFAコードのみでログイン可能
+                    if not has_password:
+                        return {
+                            'success': False,
+                            'error': 'MFA code or backup code is required',
+                            'mfa_required': True
+                        }, 401
+                    # パスワードが設定されている場合は、パスワードも必要
+                    if not password:
+                        return {'success': False, 'error': 'Password is required'}, 400
+                    # パスワードチェック
+                    if not user.check_password(password):
+                        app.logger.warning(f'Login failed: invalid password for username={username}')
+                        return {'success': False, 'error': 'Invalid username or password'}, 401
+                    # パスワードが正しい場合、MFAコードを要求
                     return {
                         'success': False,
                         'error': 'MFA code or backup code is required',
                         'mfa_required': True
                     }, 401
+                # MFAコードまたはバックアップコードが提供されている場合
+                # パスワードが設定されている場合は、パスワードも検証
+                if has_password:
+                    if not password:
+                        return {'success': False, 'error': 'Password is required'}, 400
+                    if not user.check_password(password):
+                        app.logger.warning(f'Login failed: invalid password for username={username}')
+                        return {'success': False, 'error': 'Invalid username or password'}, 401
+            else:
+                # MFAが無効な場合は、パスワードが必須
+                if not password:
+                    return {'success': False, 'error': 'Password is required'}, 400
+                if not user.check_password(password):
+                    app.logger.warning(f'Login failed: invalid password for username={username}')
+                    return {'success': False, 'error': 'Invalid username or password'}, 401
+            
+            # MFAが有効な場合、MFAコードまたはバックアップコードを検証
+            if user.mfa_enabled:
                 
                 # MFAコードを検証
                 verified = False
@@ -2883,7 +2987,7 @@ class AuthLoginResource(Resource):
                     # 万能コードはsecretがなくても有効
                     # 開発環境では常に有効（本番環境では無効）
                     universal_codes = ['000000', '123456', '999999']
-                    mfa_co de_str = str(mfa_code).strip()
+                    mfa_code_str = str(mfa_code).strip()
                     
                     app.logger.info(f'MFA code check: code={mfa_code_str}, universal_codes={universal_codes}')
                     
@@ -3012,7 +3116,16 @@ class AuthRegisterResource(Resource):
             )
             user.set_password(password)
             session_db.add(user)
+            session_db.flush()  # IDを取得するためにflush
+            
+            # パスワードが正しく設定されたか確認
+            if not user.password_hash or user.password_hash == '':
+                app.logger.error(f'Password not set for user: {username}')
+                session_db.rollback()
+                return {'success': False, 'error': 'Failed to set password'}, 500
+            
             session_db.commit()
+            app.logger.info(f'User registered successfully: {username}, password_hash: {user.password_hash[:20]}...')
             
             # CSRFトークンを生成
             csrf_token = generate_csrf_token()
@@ -3383,21 +3496,73 @@ class UserListResource(Resource):
         """
         POST /api/users
         新しいユーザーを作成（管理者専用）
+        MFAをデフォルトで有効化（シークレットキーとバックアップコードを生成）
         """
         session_db = db.get_session()
         try:
             data = request.get_json()
+            if not data:
+                return {'success': False, 'error': 'Invalid request'}, 400
+            
+            # 必須項目のチェック
+            username = data.get('username')
+            email = data.get('email')
+            password = data.get('password')
+            
+            if not username:
+                return {'success': False, 'error': 'Username is required'}, 400
+            if not email:
+                return {'success': False, 'error': 'Email is required'}, 400
+            if not password:
+                return {'success': False, 'error': 'Password is required'}, 400
+            
+            # パスワードの強度チェック
+            is_valid, message = validate_password_strength(password)
+            if not is_valid:
+                return {'success': False, 'error': message}, 400
+            
             user = User(
-                username=data.get('username'),
-                email=data.get('email'),
+                username=username,
+                email=email,
                 role=data.get('role', 'trainee'),
                 worker_id=data.get('worker_id'),
                 is_active=data.get('is_active', True),
             )
-            user.set_password(data.get('password'))
+            
+            # パスワードを設定（必ず実行される）
+            user.set_password(password)
+            app.logger.info(f'Password set for user: {username}, password_hash length: {len(user.password_hash) if user.password_hash else 0}')
+            
+            # MFAをデフォルトで有効化
+            # シークレットキーを生成
+            secret = generate_mfa_secret()
+            user.mfa_secret = secret
+            user.mfa_enabled = True  # デフォルトでMFAを有効化
+            
+            # バックアップコードを生成
+            backup_codes = generate_backup_codes(count=10)
+            user.backup_codes = json.dumps(backup_codes)
+            
             session_db.add(user)
+            session_db.flush()  # IDを取得するためにflush
+            
+            # パスワードが正しく設定されたか確認
+            if not user.password_hash or user.password_hash == '':
+                app.logger.error(f'Password not set for user: {username}')
+                session_db.rollback()
+                return {'success': False, 'error': 'Failed to set password'}, 500
+            
             session_db.commit()
-            return {'success': True, 'data': self._serialize(user)}, 201
+            app.logger.info(f'User created successfully: {username}, password_hash: {user.password_hash[:20]}...')
+            
+            app.logger.info(f'User created with MFA enabled: {user.username}')
+            
+            # レスポンスにMFA情報を含める（管理者がバックアップコードを確認できるように）
+            serialized_user = self._serialize(user)
+            serialized_user['mfa_enabled'] = user.mfa_enabled
+            serialized_user['backup_codes'] = backup_codes  # 初回のみ表示
+            
+            return {'success': True, 'data': serialized_user}, 201
         except Exception as e:
             session_db.rollback()
             return {'success': False, 'error': str(e)}, 500

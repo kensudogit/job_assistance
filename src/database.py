@@ -28,7 +28,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime)
     # 多要素認証（MFA）関連フィールド
-    mfa_enabled = Column(Boolean, default=False)  # MFAが有効かどうか
+    mfa_enabled = Column(Boolean, default=True)  # MFAが有効かどうか（デフォルトで有効）
     mfa_secret = Column(String(32), nullable=True)  # TOTPシークレットキー（Base32エンコード）
     backup_codes = Column(Text, nullable=True)  # バックアップコード（JSON形式、暗号化推奨）
     created_at = Column(DateTime, default=datetime.now)
@@ -39,6 +39,8 @@ class User(Base):
     
     def set_password(self, password: str):
         """パスワードをハッシュ化して設定"""
+        if not password or password.strip() == '':
+            raise ValueError('Password cannot be empty')
         salt = secrets.token_hex(16)
         password_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
         self.password_hash = f"{salt}:{password_hash.hex()}"
@@ -46,6 +48,9 @@ class User(Base):
     def check_password(self, password: str) -> bool:
         """パスワードを検証"""
         try:
+            # パスワードが設定されていない場合はFalseを返す
+            if not self.password_hash or self.password_hash == '':
+                return False
             salt, stored_hash = self.password_hash.split(':')
             password_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
             return password_hash.hex() == stored_hash
@@ -1232,7 +1237,7 @@ class Database:
                 
                 # 追加が必要なカラムのリスト
                 required_columns = {
-                    'mfa_enabled': 'BOOLEAN DEFAULT FALSE',
+                    'mfa_enabled': 'BOOLEAN DEFAULT TRUE',
                     'mfa_secret': 'VARCHAR(32)',
                     'backup_codes': 'TEXT',
                 }

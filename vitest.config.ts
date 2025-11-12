@@ -21,6 +21,13 @@ export default defineConfig({
     environment: 'jsdom',             // DOM環境をシミュレート（ブラウザ環境）
     setupFiles: './tests/setup.ts',   // テスト実行前に読み込むセットアップファイル
     css: true,                        // CSSファイルをテストでインポート可能にする
+    include: [
+      '**/__test__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      '**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', // testsフォルダ内のテストも検索
+    ],                                // __test__フォルダと通常のテストファイルを検索
+    testTimeout: 10000,               // テストのタイムアウト時間（10秒）
+    hookTimeout: 10000,               // フックのタイムアウト時間（10秒）
   },
   
   // パスエイリアスの設定（Viteと同じ設定）

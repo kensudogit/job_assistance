@@ -661,6 +661,30 @@ export interface IntegratedDashboardData {
     total_score?: number;
     passed?: boolean;
   }>;
+  summary?: {
+    total_sessions: number;
+    total_training_hours: number;
+    average_overall_score?: number;
+    latest_overall_score?: number;
+    total_milestones: number;
+    achieved_milestones: number;
+    milestone_achievement_rate: number;
+  };
+  recent_milestones?: Array<{
+    id: number;
+    milestone_name: string;
+    milestone_type: string;
+    target_date?: string;
+    achieved_date?: string;
+    status: string;
+  }>;
+  recent_progress?: Array<{
+    id: number;
+    progress_date: string;
+    progress_type: string;
+    title?: string;
+    status: string;
+  }>;
 }
 
 // 訓練管理API
@@ -798,24 +822,56 @@ export const careerPathApi = {
 export const integratedDashboardApi = {
   get: async (workerId: number): Promise<IntegratedDashboardData> => {
     try {
-      const response = await api.get<ApiResponse<IntegratedDashboardData>>(`/api/workers/${workerId}/dashboard/integrated`);
+      console.log('[integratedDashboardApi] Fetching data for workerId:', workerId);
+      const url = `/api/workers/${workerId}/dashboard/integrated`;
+      console.log('[integratedDashboardApi] API URL:', url);
+      const response = await api.get<ApiResponse<IntegratedDashboardData>>(url);
+      console.log('[integratedDashboardApi] API response:', response.data);
       if (response.data.success && response.data.data) {
         // デフォルト値を設定して、不完全なレスポンスに対応
         // 配列であることを確認し、そうでない場合は空配列を設定
         const data = response.data.data;
-        return {
+        const result = {
           kpi_timeline: Array.isArray(data.kpi_timeline) ? data.kpi_timeline : [],
           japanese_proficiency: Array.isArray(data.japanese_proficiency) ? data.japanese_proficiency : [],
+          summary: data.summary || {
+            total_sessions: 0,
+            total_training_hours: 0,
+            average_overall_score: undefined,
+            latest_overall_score: undefined,
+            total_milestones: 0,
+            achieved_milestones: 0,
+            milestone_achievement_rate: 0,
+          },
+          recent_milestones: Array.isArray(data.recent_milestones) ? data.recent_milestones : [],
+          recent_progress: Array.isArray(data.recent_progress) ? data.recent_progress : [],
         };
+        console.log('[integratedDashboardApi] Processed data:', result);
+        return result;
+      } else {
+        console.warn('[integratedDashboardApi] API response not successful:', response.data);
       }
     } catch (error) {
-      console.error('Failed to fetch integrated dashboard data:', error);
+      console.error('[integratedDashboardApi] Failed to fetch integrated dashboard data:', error);
     }
     // エラー時も空のデータを返す（エラー表示はコンポーネント側で処理）
-    return {
+    const defaultData = {
       kpi_timeline: [],
       japanese_proficiency: [],
+      summary: {
+        total_sessions: 0,
+        total_training_hours: 0,
+        average_overall_score: undefined,
+        latest_overall_score: undefined,
+        total_milestones: 0,
+        achieved_milestones: 0,
+        milestone_achievement_rate: 0,
+      },
+      recent_milestones: [],
+      recent_progress: [],
     };
+    console.log('[integratedDashboardApi] Returning default data:', defaultData);
+    return defaultData;
   },
 };
 

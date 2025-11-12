@@ -29,8 +29,8 @@
     },
 
     /* Types */
-    "types": ["vite/client", "vitest/globals"]
+    "types": ["vite/client", "vitest/globals", "next"]
   },
-  "include": ["src", "components", "lib", "tests"],
+  "include": ["src", "components", "lib", "tests", "app"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
